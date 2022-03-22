@@ -1,9 +1,12 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 (function (__filename){(function (){
-const timelineDays = require('..')
 const csjs = require('csjs-inject')
 const bel = require('bel')
 const message_maker = require('message-maker')
+
+const { isBefore, getYear, getMonth, getDaysInMonth } = require('date-fns')
+const calendarMonth = require('../src/node_modules/datdot-ui-calendar-month')
+const datepicker = require('..')
 
 var id = 0
 
@@ -23,7 +26,7 @@ function demo () {
         }
     }
     function listen (msg) {
-        console.log('New message', { msg })
+        console.log('DEMO', { msg })
         const { head, refs, type, data, meta } = msg // receive msg
         inbox[head.join('/')] = msg                  // store msg
         const [from] = head
@@ -32,115 +35,133 @@ function demo () {
         from_notify(from_make({ to: from_address, type: 'ack', refs: { 'cause': head } }))
     }
 // ------------------------------------
-  const data = {
-    count: 3,
-    month:2,
-    year: 2022,
-    days: 29
-  }
-  const timelinedays = timelineDays( {data, style: `${css['timeline-days']}` }, make_protocol('calendar-days') )
-  const el = bel`<div class=${css.days}>
-    <h2 class=${css.title}>Timline days</h2>
-    <div class=${css['calendar-timeline-days']}>${timelinedays}</div>
-  </div>`
+
+    // init date
+    const date = new Date()
+    let year = getYear(date)
+    // get current month
+    let currentMonth = getMonth(date)
+    let currentDays = getDaysInMonth(date)
+    // get next month
+    let nextMonth = currentMonth+1
+    let nextDays = getDaysInMonth(new Date(year, nextMonth))
+    // store data
+    let state = {}
+    let counter = 0
+
+    // SUB COMPONENTS
+    const calendarmonth1 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
+    const calendarmonth2 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
+    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, make_protocol(`datepicker-${counter++}`))
+
+    const weekday = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
+    const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    weekList.map( w => weekday.append( bel`<div class=${css['calendar-week']} role="week">${w.slice(0 ,1)}</div>`))
+
+    const el = bel`
+    <div class=${css.wrap}>
+      <section class=${css["ui-widgets"]}>
+        <!--- ui-calendar-month start -->
+        <div class=${css['ui-calendar-header']}>
+          <h2 class=${css.title}>Calendar Header</h2>
+          <div class=${css["custom-header"]}>${calendarmonth1}</div>
+          <div class=${css["calendar-header-fullsize"]}>${calendarmonth2}</div>
+        </div>
+        <!--- // ui-calendar-month end -->
+        <!--- ui-datepicker start -->
+        <div class=${css['ui-datepicker']}>
+          <h2 class=${css.title}>Date Picker</h2>
+          ${datepicker1}
+        </div>
+        <!--- // ui-datepicker end -->
+      </section>
+      <div class=${css.terminal}> </div>
+    </div>`
 
   return el
     
 }
 
+
 const css = csjs`
 body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, Helvetica, sans-serif;
-  background-color: #F2F2F2;
-  height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #F2F2F2;
+    height: 100%;
 }
 button:active, button:focus {
-  outline: dotted 1px #c9c9c9;
+    outline: dotted 1px #c9c9c9;
 }
 .wrap {
-  display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 75vh 25vh;
-  min-width: 520px
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 75vh 25vh;
+    min-width: 520px
 }
 .terminal {
-  background-color: #212121;
-  color: #f2f2f2;
-  font-size: 13px;
-  padding: 0 20px;
-  overflow-y: auto;
+    background-color: #212121;
+    color: #f2f2f2;
+    font-size: 13px;
+    padding: 0 20px;
+    overflow-y: auto;
 }
 .terminal div {
-  margin: 10px 0;
+    margin: 10px 0;
 }
 .terminal div:last-child {
-  color: #FFF500;
-  font-weight: bold;
+    color: #FFF500;
+    font-weight: bold;
 }
 .ui-widgets {
-  padding: 20px;
-  overflow-y: auto;
+    padding: 20px;
+    overflow-y: auto;
 }
 .ui-widgets > div {
-  margin-bottom: 30px;
-  padding: 10px 20px 20px 20px;
-  background-color: #fff;
-}
-.ui-tab {
-}
-.ui-tab > nav {
-  margin-bottom: 20px;
+    margin-bottom: 30px;
+    padding: 10px 20px 20px 20px;
+    background-color: #fff;
 }
 .title {
-  color: #008dff;
+    color: #008dff;
 }
 .ui-calendar-header {
 }
 .custom-header {
-  background-color: #f2f2f2;
-  max-width: 25%;
-  min-width: 225px;
-  border-radius: 50px;
+    background-color: #f2f2f2;
+    max-width: 25%;
+    min-width: 225px;
+    border-radius: 50px;
 }
 .custom-header > [class^="calendar-header"] {
-  grid-template-rows: 30px;
+    grid-template-rows: 30px;
 }
 .custom-header > [class^="calendar-header"] h3 {
-  font-size: 16px;
+    font-size: 16px;
 }
 .calendar-header-fullsize {
 }
 .days {
 }
-.calendar-timeline-days {
-}
-.timeline-days {
-  display: grid;
-  grid-template-rows: auto;
-  grid-template-columns: repeat(auto-fit, minmax(30px, auto));
-  justify-content: left;
-  align-items: center;
-}
 .calendar-section {
-  margin-top: 30px;
-  font-size: 12px;
+    margin-top: 30px;
+    font-size: 12px;
 }
 .calendar-table-days {
-  max-width: 210px;
+    max-width: 210px;
 }
 .calendar-days {
-  display: grid;
-  grid-template-rows: auto;
-  grid-template-columns: repeat(7, minmax(30px, auto));
-  justify-items: center;
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: repeat(7, minmax(30px, auto));
+    justify-items: center;
 }
 .calendar-weekday {
-  display: grid;
-  grid-template-rows: auto;
-  grid-template-columns: repeat(7, 30px);
-  justify-items: center;
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: repeat(7, 30px);
+    justify-items: center;
 }
 .calendar-week {
 }
@@ -150,7 +171,7 @@ button:active, button:focus {
 
 document.body.append(demo())
 }).call(this)}).call(this,"/demo/demo.js")
-},{"..":300,"bel":3,"csjs-inject":6,"message-maker":296}],2:[function(require,module,exports){
+},{"..":303,"../src/node_modules/datdot-ui-calendar-month":305,"bel":3,"csjs-inject":6,"date-fns":149,"message-maker":299}],2:[function(require,module,exports){
 var trailingNewlineRegex = /\n[\s]+$/
 var leadingNewlineRegex = /^\n[\s]+/
 var trailingSpaceRegex = /[\s]+$/
@@ -384,7 +405,7 @@ module.exports = hyperx(belCreateElement, {comments: true})
 module.exports.default = module.exports
 module.exports.createElement = belCreateElement
 
-},{"./appendChild":2,"hyperx":298}],4:[function(require,module,exports){
+},{"./appendChild":2,"hyperx":301}],4:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -403,7 +424,7 @@ function csjsInserter() {
 module.exports = csjsInserter;
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"csjs":9,"insert-css":299}],5:[function(require,module,exports){
+},{"csjs":9,"insert-css":302}],5:[function(require,module,exports){
 'use strict';
 
 module.exports = require('csjs/get-css');
@@ -21846,6 +21867,124 @@ function yearsToQuarters(years) {
 
 module.exports = exports.default;
 },{"../_lib/requiredArgs/index.js":36,"../constants/index.js":65}],296:[function(require,module,exports){
+(function (__filename){(function (){
+const style_sheet = require('support-style-sheet')
+const svg = require('svg')
+const message_maker = require('message-maker')
+
+var id = 0
+
+module.exports = ({name, path, is_shadow = false, theme}, parent_protocol) => {
+// ---------------------------------------------------------------
+    const myaddress = `${__filename}-${id++}`
+    const inbox = {}
+    const outbox = {}
+    const recipients = {}
+    const names = {}
+    const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
+
+    const {notify, address} = parent_protocol(myaddress, listen)
+    names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
+    notify(recipients['parent'].make({ to: address, type: 'ready', refs: ['old_logs', 'new_logs'] }))
+
+    function listen (msg) {
+        const {head, refs, type, data, meta } = msg
+        inbox[head.join('/')] = msg                  // store msg
+        const [from, to, msg_id] = head    
+        console.log('New message', { msg })
+    }
+ // ---------------------------------------------------------------   
+    const url = path ? path : './src/svg'
+    const symbol = svg(`${url}/${name}.svg`)
+    if (is_shadow) {
+        function layout (style) {
+            const icon = document.createElement('i-icon')
+            const shadow = icon.attachShadow({mode: 'closed'})
+            const slot = document.createElement('slot')
+            slot.name = 'icon'
+            style_sheet(shadow, style)
+            slot.append(symbol)
+            shadow.append(slot)
+            shadow.addEventListener('click', handleOnClick)
+            return icon
+        }
+
+        function handleOnClick (e) {
+            console.log('Click', e)
+            const { notify, address, make } = recipients['parent']
+            notify(make({ to: address, type: 'click', data: { event: e }, refs: {} }))
+        }
+
+        // insert CSS style
+        const custom_style = theme ? theme.style : ''
+        // set CSS variables
+        if (theme && theme.props) {
+            var { fill, size } = theme.props
+        }
+        const style = `
+        :host(i-icon) {
+            --size: ${size ? size : '24px'};
+            --fill: ${fill ? fill : 'var(--primary-color)'};
+            display: block;
+        }
+        slot[name='icon'] {
+            display: grid;
+            justify-content: center;
+            align-items: center;
+        }
+        slot[name='icon'] span {
+            display: block;
+            width: var(--size);
+            height: var(--size);
+        }
+        slot[name='icon'] svg {
+            width: 100%;
+            height: auto;
+        }
+        slot[name='icon'] g {
+            fill: hsl(var(--fill));
+            transition: fill .3s ease-in-out;
+        }
+        ${custom_style}
+        `
+        return layout(style)
+    }
+
+    return symbol
+}
+
+}).call(this)}).call(this,"/node_modules/datdot-ui-icon/src/index.js")
+},{"message-maker":299,"support-style-sheet":297,"svg":298}],297:[function(require,module,exports){
+module.exports = support_style_sheet
+function support_style_sheet (root, style) {
+    return (() => {
+        try {
+            const sheet = new CSSStyleSheet()
+            sheet.replaceSync(style)
+            root.adoptedStyleSheets = [sheet]
+            return true 
+        } catch (error) { 
+            const inject_style = `<style>${style}</style>`
+            root.innerHTML = `${inject_style}`
+            return false
+        }
+    })()
+}
+},{}],298:[function(require,module,exports){
+module.exports = svg
+function svg (path) {
+    const span = document.createElement('span')
+    span.classList.add('icon')
+    get_svg()
+    async function get_svg () {
+        const res = await fetch(path)
+        if (res.status !== 200) throw new Error(res.status)
+        let data = await res.text()
+        span.innerHTML = data
+    }
+    return span
+}   
+},{}],299:[function(require,module,exports){
 module.exports = function message_maker (from) {
   let msg_id = 0
   return function make ({to, type, data = null, refs = {} }) {
@@ -21853,7 +21992,7 @@ module.exports = function message_maker (from) {
       return { head: [from, to, msg_id++], refs, type, data, meta: { stack }}
   }
 }
-},{}],297:[function(require,module,exports){
+},{}],300:[function(require,module,exports){
 module.exports = attributeToProperty
 
 var transform = {
@@ -21874,7 +22013,7 @@ function attributeToProperty (h) {
   }
 }
 
-},{}],298:[function(require,module,exports){
+},{}],301:[function(require,module,exports){
 var attrToProp = require('hyperscript-attribute-to-property')
 
 var VAR = 0, TEXT = 1, OPEN = 2, CLOSE = 3, ATTR = 4
@@ -22171,7 +22310,7 @@ var closeRE = RegExp('^(' + [
 ].join('|') + ')(?:[\.#][a-zA-Z0-9\u007F-\uFFFF_:-]+)*$')
 function selfClosing (tag) { return closeRE.test(tag) }
 
-},{"hyperscript-attribute-to-property":297}],299:[function(require,module,exports){
+},{"hyperscript-attribute-to-property":300}],302:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -22195,19 +22334,569 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],300:[function(require,module,exports){
+},{}],303:[function(require,module,exports){
 (function (__filename){(function (){
 const bel = require('bel')
-const message_maker = require('message-maker')
 const csjs = require('csjs-inject')
-const { format, getDate, getMonth, getYear, getDaysInMonth, isToday } = require('date-fns')
+const message_maker = require('message-maker')
+const foo = require('date-fns')
+// debugger
+const { isPast, isFuture, setMonth, getYear, getMonth, format, getDaysInMonth } = require('date-fns')
+const icon = require('datdot-ui-icon')
+// widgets
+const calendarDays = require('datdot-ui-calendar-days')
+const calendarMonth = require('datdot-ui-calendar-month')
 
 var id = 0
 
-module.exports = datdot_ui_timeline_days
+module.exports = datepicker
 
-function datdot_ui_timeline_days({from = 'Default', data = null, style}, parent_protocol) {
+function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, parent_protocol) {
+  
+  let name1 = 'calendar1'
+  let name2 = 'calendar2'
+  let count = month1[1]
+  let value = {}
+  let counter = 0
+  
+  // -----------------------------------
+  const myaddress = `${__filename}-${id++}`
+  const inbox = {}
+  const outbox = {}
+  const recipients = {}
+  const names = {}
+  const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
 
+  const {notify, address} = parent_protocol(myaddress, listen)
+  names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
+  notify(recipients['parent'].make({ to: address, type: 'ready', refs: {} }))
+  
+  function make_protocol (name) {
+    return function protocol (address, notify) {
+      console.log('PROTOCOL INIT', { name, address })
+      names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
+      return { notify: listen, address: myaddress }
+    }
+  }
+  
+  function listen (msg) {
+    const { head, refs, type, data, meta } = msg // receive msg
+    inbox[head.join('/')] = msg                  // store msg
+    const [from] = head
+    console.log('DATEPICKER', { type, from, name: names[from].name, msg, data })
+    // handlers
+    if (type === 'value/first') return storeFirstAndNotify(from, data)
+      if (type === 'value/second') return notifyParent(from, data)
+      if (type === 'selecting-second') return notifyOtherCalenderSelectingLast(from)
+      if (type === 'cleared') return clearOther( names[from].name === name1 ? name2 : name1)
+      if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
+    }
+    // -----------------------------------
+  let path = 'https://raw.githubusercontent.com/datdotorg/datdot-ui-icon/7f9b4be67c8df3935a93c727f51714c07c9f770d/src/svg/'
+  const { make } = recipients['parent']
+
+  // elements
+  let cal1 = calendarDays({name: name1, month: month1[1], days: month1[2], year: month1[0], status }, make_protocol(name1))
+  let cal2 = calendarDays({name: name2, month: month2[1], days: month2[2], year: month2[0], status }, make_protocol(name2))
+  const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const title1 = calendarMonth({ getDate: new Date(month1[0], month1[1]), view: 'datepicker-range-days'}, make_protocol(`cal-month-${counter++}`))
+  const title2 = calendarMonth({ getDate: new Date(month2[0], month2[1]), view: 'datepicker-range-days'}, make_protocol(`cal-month-${counter++}`))
+  const iconPrev = icon({ theme: { style: `${css.icon} ${css['icon-prev']}` }, name: 'arrow-left', path }, make_protocol(`icon-${counter++}`) )
+  const iconNext = icon({ theme: { style: `${css.icon} ${css['icon-next']}` }, name: 'arrow-right', path }, make_protocol(`icon-${counter++}`) )
+  const prevMonth  = bel`<button role="button" aria-label="Previous month" class="${css.btn} ${css.prev}" onclick=${triggerPreviousMonth}>${iconPrev}</button>`
+  const nextMonth = bel`<button role="button" aria-label="Next month" class="${css.btn} ${css.next}" onclick=${triggerNextMonth}>${iconNext}</button>`
+  const container = bel`<div class=${css['calendar-container']}></div>`
+
+  container.append( calendarView(title1, cal1), calendarView(title2, cal2) )
+
+  return bel`<div class=${css.datepicker}> <div class=${css["calendar-header"]}>${prevMonth}${nextMonth}</div> ${container} </div>`
+
+  function calendarView (title, calendar) { return  bel`<div class=${css.calendar}>${title}${makeWeekDays()}${calendar}</div>` }
+
+  function triggerPreviousMonth () {
+    count -= 2
+    const prevCal1 = monthResult(count)
+    const prevCal2 = monthResult(count + 1)
+
+    const { notify: name_1_notify, address: name_1_address, make: name_1_make } = recipients[name1]
+    const ca1 = name_1_notify(name_1_make({ to: name_1_address, type: 'change', data: { body: prevCal1 } }))
+
+    const { notify: name_2_notify, address: name_2_address, make: name_2_make } = recipients[name2]
+    const ca2 = name_2_notify(name_2_make({ to: name_2_address, type: 'change', data: { body: prevCal2 } }))
+    
+    const month1Title = calendarMonth({from: name, getDate: new Date(prevCal1.year, prevCal1.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    const month2Title = calendarMonth({from: name, getDate: new Date(prevCal2.year, prevCal2.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    container.innerHTML = ''
+    container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
+
+    const pastMonth = value.first ? isPast(new Date(prevCal1.year, prevCal1.count, prevCal1.days)) : undefined
+    if (pastMonth) return forwardMessage({ type: 'color-range-from-start' })
+}
+function triggerNextMonth () {
+    count += 2
+    const nextCal1 = monthResult(count)
+    const nextCal2 = monthResult(count + 1)
+
+    const { notify: name_1_notify, address: name_1_address, make: name_1_make } = recipients[name1]
+    const ca1 = name_1_notify(name_1_make({ to: name_1_address, type: 'change', data: { body: nextCal1 } }))
+
+    const { notify: name_2_notify, address: name_2_address, make: name_2_make } = recipients[name2]
+    const ca2 = name_2_notify(name_2_make({ to: name_2_address, type: 'change', data: { body: nextCal2 } }))
+    const month1Title = calendarMonth({from: name, getDate: new Date(nextCal1.year, nextCal1.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    const month2Title = calendarMonth({from: name, getDate: new Date(nextCal2.year, nextCal2.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    container.innerHTML = ''
+    container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
+    
+    const nextMonth = value.first ? isFuture(new Date(nextCal1.year, nextCal1.count, nextCal1.days)) : undefined
+    if (nextMonth) return forwardMessage({ type: 'color-range-to-end' })
+}
+
+  function makeWeekDays () {
+      const el = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
+      weekList.map( w => {
+          let div = bel`<div class=${css['calendar-week']} role="week">${w.slice(0 ,1)}</div>`
+          el.append(div)
+      })
+      return el
+  }
+
+  function monthResult(number) {
+    let date = setMonth(new Date(), number)
+    let year = getYear(date)
+    let count = getMonth(date)
+    let month = format(date, 'MMMM')
+    let days = getDaysInMonth(date)
+    const result = {count, year, month, days}
+    return result
+}
+
+  //////
+  
+  function forwardMessage ({from, type, data = {}}) {
+    let keys = Object.keys(recipients)
+    if (from) keys = keys.filter(key => key !== names[from].name) // notify all other children
+    broadcast(keys, type, data)
+  }
+
+  function clearOther (name) {
+    const { notify: name_notify, make: name_make, address: name_address } = recipients[name]
+      name_notify(name_make({ to: name_address, type: 'clear' }))
+  }
+
+  function notifyParent (from, data) {
+      value.second = data.body
+      notify(make({ to: address, type: 'value/second', data: { body: value } } ))
+  }
+
+  function notifyOtherCalenderSelectingLast (from) {
+      const { notify: from_notify, make: from_make, address: from_address } = names[from]
+      let type
+      if (names[from].name === name1) type = 'color-from-start'
+      if (names[from].name === name2) type = 'color-to-end'
+      from_notify(from_make({ to: from_address, type }))
+  }
+
+  function storeFirstAndNotify (from, data) {
+      value.first = data.body
+      const type = names[from].name === name1 ? 'first-selected-by-startcal' : 'first-selected-by-endcal'
+      const keys = Object.keys(recipients).filter(key => key !== names[from].name) // notify all other children
+      notify(make({ to: address, type: 'value/first', date: { data } } ))
+      broadcast(keys, type, data)
+  }
+
+  function broadcast (keys, type, data) {
+    for ( let i = 0, len = keys.length; i < len; i++) {
+      const key = keys[i]
+        const { notify: from_notify, make: from_make, address: from_address } = recipients[key]
+        from_notify(from_make({ to: from_address, type, data }))
+    }
+  }
+
+}
+
+const css = csjs`
+.datepicker {
+    position: relative;
+    max-width: 510px;
+}
+.datepicker-body {
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: repeat(2, 210px);
+    grid-gap: 35px;
+}
+.btn {
+    background: none;
+    border: none;
+    border-radius: 50px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    transition: background-color 0.3s ease-in-out;
+    cursor: pointer;
+}
+.btn:active, .btn:hover {
+    background-color: #C9C9C9;
+}
+.prev {}
+.next {}
+.icon svg path {
+    transition: stroke 0.25s ease-in-out;
+}
+.icon-prev {}
+.icon-next {}
+.calendar-header {
+    position: absolute;
+    z-index: 9;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+.calendar-container {
+    display: flex;
+}
+.calendar-weekday {
+    display: grid;
+    grid-template-rows: 30px;
+    grid-template-columns: repeat(7, minmax(30px, auto));
+    justify-items: center;
+    font-size: 12px;
+}
+.calendar-week {
+    
+}
+.calendar {
+    margin-left: 30px;
+}
+.title {
+    font-size: 18px;
+    text-align: center;
+}
+`
+}).call(this)}).call(this,"/src/index.js")
+},{"bel":3,"csjs-inject":6,"datdot-ui-calendar-days":304,"datdot-ui-calendar-month":305,"datdot-ui-icon":296,"date-fns":149,"message-maker":299}],304:[function(require,module,exports){
+(function (__filename){(function (){
+const bel = require('bel')
+const csjs = require('csjs-inject')
+const { isToday, format, isPast, getDay, getDate, getMonth, getYear, getDaysInMonth } = require('date-fns')
+const message_maker = require('message-maker')
+
+var id = 0
+
+module.exports = calendarDays
+
+function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'}, parent_protocol) {
+
+// -----------------------------------
+  const myaddress = `${__filename}-${id++}`
+  const inbox = {}
+  const outbox = {}
+  const recipients = {}
+  const names = {}
+  const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
+
+  const {notify, address} = parent_protocol(myaddress, listen)
+  names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
+  notify(recipients['parent'].make({ to: address, type: 'ready', refs: {} }))
+
+  function make_protocol (name) {
+      return function protocol (address, notify) {
+          console.log('PROTOCOL INIT', { name, address })
+          names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
+          return { notify: listen, address: myaddress }
+      }
+  }
+
+  function listen (msg) {
+      const { head, refs, type, data, meta } = msg // receive msg
+      inbox[head.join('/')] = msg                  // store msg
+      const [from] = head
+      console.log('CALENDAR DAYS LISTENS', { type, from, name: names[from].name, msg, data })
+      // handlers
+      if (type === 'clear') return actionClear()
+      if (type === 'selecting-second') return actionSelectingSecond(data.body)
+      if (type === 'not-selecting-second') return actionKeepFirst(data.body)
+      if (type === 'first-selected-by-startcal') return setStatus('first-selected-by-startcal')
+      if (type === 'first-selected-by-endcal') return setStatus('first-selected-by-endcal')
+      if (type === 'second-selected') return setStatus('second-selected-by-other')
+      if (type === 'color-from-start') return actionColorFromStart()
+      if (type === 'color-to-end') return actionColorToEnd()
+      if (type === 'change') return actionRenderNewCalendars(data.body)
+      if (type === 'color-range-from-start') return 
+      if (type === 'color-range-to-end') return 
+
+  }
+// -----------------------------------
+    let nowMonth = month, nowDays = days, nowYear = year
+    const calendar = makeDays(nowDays)
+    let buttons = [...calendar.children]
+    let first, second
+    calendar.onmousemove = onmousemove
+    calendar.onclick = onclick
+    calendar.onmouseleave = onmouseleave
+    calendar.onmouseenter = onmouseenter
+
+    const { make } = recipients['parent']
+
+    return calendar
+
+    function setStatus( nextStatus ) {
+        console.log('setStatus', JSON.stringify({ type: 'status', data: { body: nextStatus } }, 0, 2))
+        status = nextStatus
+        notify(make({ to: address, type: 'status', data: { status: nextStatus } }))
+    }
+
+    function actionRenderNewCalendars(body) {
+        const { count, year, days } = body
+        nowMonth = count
+        nowYear = year
+        nowDays = days
+        const cal = makeDays(nowDays)
+        buttons = [...cal.children]
+
+        cal.onmousemove = onmousemove
+        cal.onclick = onclick
+        cal.onmouseleave = onmouseleave
+        cal.onmouseenter = onmouseenter
+        
+        return cal
+    }
+    
+    function actionSelectingSecond (body) {
+        colorRange(0, first)
+    }
+
+    function actionKeepFirst (body) {
+        onlyKeepFirst()
+    }
+
+    function actionColorToEnd () {
+        colorRange(first, days + 1)
+    }
+
+    function actionColorFromStart () {
+        colorRange(0, first)
+    }
+
+    function actionClear () {
+        clearSelf()
+    }
+
+    function clearAndNotify () {
+      clearSelf()
+      notify(make({ to: address, type: 'not-selecting-second', data: { body: '' } }))
+    }
+      
+    function notifyOther () {
+      notify(make({ to: address, type: 'selecting-second' }))
+    }
+
+    function onlyKeepFirst () {
+        buttons.map( btn => {
+            const num = parseInt(btn.dataset.num)
+            if ( num != first ) {
+                btn.classList.remove(css['date-in-range'])
+                btn.classList.remove([css['date-selected']])
+            }
+        })
+    }
+
+    function onmouseenter (event) {
+        console.log('current status', status)
+        if (status === 'cleared') return
+        if (status === 'first-selected-by-self') return
+        if (status === 'first-selected-by-startcal') return notifyOther()
+        if (status === 'first-selected-by-endcal') return notifyOther()
+        if (status === 'second-selected-by-self') return
+        if (status === 'second-selected-by-other') return
+    }
+
+    function onmouseleave (event) {
+        console.log('current status', status)
+        if (status === 'cleared') return
+        if (status === 'first-selected-by-self') return onlyKeepFirst()
+        if (status === 'first-selected-by-startcal') return clearAndNotify()
+        if (status === 'first-selected-by-endcal') return clearAndNotify()
+        if (status === 'second-selected-by-self') return
+        if (status === 'second-selected-by-other') return
+    }
+
+    function onmousemove (event) {
+        const btn = event.target
+        const current = parseInt(btn.dataset.num)
+        if (!current || btn.classList.contains(css["disabled-day"])) return
+        if (status === 'cleared') return
+        if (status === 'first-selected-by-self') return markRange(btn, first, current)
+        if (status === 'first-selected-by-startcal') return markRange(btn, 0, current)
+        if (status === 'first-selected-by-endcal') return markRange(btn, first, current)
+        if (status === 'second-selected-by-self') return
+        if (status === 'second-selected-by-other') return
+        
+    }
+
+    function onclick (event) {
+        console.log('onclick: current status', status)
+        const btn = event.target
+        const current = parseInt(btn.dataset.num)
+        if (!current || btn.classList.contains(css["disabled-day"])) return
+        if (status === 'cleared') return selectFirst(btn, current)
+        if (status === 'first-selected-by-self') return selectSecond(btn, current)
+        if (status === 'first-selected-by-startcal') return selectSecond(btn, current)
+        if (status === 'first-selected-by-endcal') return selectSecond(btn, current)
+        if (status === 'second-selected-by-self') return selectFirst(btn, current)
+        if (status === 'second-selected-by-other') return selectFirst(btn, current)
+    }
+
+    function clearSelf () {
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].classList.remove(css['date-in-range'])
+            buttons[i].classList.remove(css['date-selected'])
+        }
+        first = second = void 0
+    }
+
+    function selectSecond (btn, current) {
+        second = current
+        setStatus('second-selected-by-self')
+        notify(make({ to: address, type: 'second-selected' }))
+        return notify(make({ to: address, type: 'value/second', data: { body: [nowYear, nowMonth+1, second] } }))
+    }
+
+    function selectFirst (btn, current) {
+        clearSelf()
+        notify(make({ to: address, type: 'cleared' })) // notify parent to notify other cal to clear itself too
+        first = current
+        btn.classList.add(css['date-selected'])
+        setStatus('first-selected-by-self')
+        return notify(make({ to: address, type: 'value/first', data: { body: [nowYear, nowMonth+1, first] } }))
+    }
+
+    function markRange (btn, A, B) {
+        if (A === B) return onlyKeepFirst()
+        if (A < B) colorRange(A, B)
+        else colorRange(B, A)
+    }
+
+    function colorRange (first, second) {
+        buttons.map( btn => {
+            let current = parseInt(btn.dataset.num)
+            if (!current || btn.classList.contains(css["disabled-day"])) return
+            if (current < first) {
+                btn.classList.remove(css['date-selected'])
+                btn.classList.remove(css['date-in-range'])
+            } 
+            if (current === first ) { 
+                btn.classList.add(css['date-selected'])
+            }
+            if (current > first) {
+                btn.classList.add(css['date-in-range'])
+            }
+            if (current === second) {
+                btn.classList.add(css['date-selected'])
+            }
+            if (current > second - 1) {
+                btn.classList.remove(css['date-in-range'])
+            }
+            if (current > second) {
+                btn.classList.remove(css['date-selected'])
+                btn.classList.remove(css['date-in-range'])
+            }
+        })
+    }
+
+    function makeDays (days) {
+        const el = bel`<section role="calendar-days" class=${css["calendar-days"]}></section>`
+        // make space for week
+        getSpaceInPrevMonth(el)
+
+        for (let i = 1; i < days + 1; i++) {
+            let formatDate = format(new Date(nowYear, nowMonth, i), 'd MMMM yyyy, EEEE')
+            let btn = bel`<button role="button" aria-selected="false" tabindex="-1" data-num="${i}" aria-label="${formatDate}" data-date="${nowYear}-${nowMonth+1}-${i}">${i}</button>`
+            if (isToday(new Date(nowYear, nowMonth, i)) ) {
+                btn.classList.add(css.today)
+                btn.setAttribute('aria-today', true)
+            } else { 
+                btn.classList.add(css.day)
+                if ( isPast(new Date(nowYear, nowMonth, i)) ) btn.classList.add(css["disabled-day"])
+                btn.setAttribute('aria-today', false)
+            }
+            el.append(btn)
+        }
+        
+        return el
+    }
+
+    function getSpaceInPrevMonth (el) {
+        // get days in previous month
+        let daysInPrevMonth = getDaysInMonth(new Date(nowYear, nowMonth-1))
+        // get day in prev month which means to add how many spans
+        let dayInPrevMonth = getDay(new Date(nowYear, nowMonth-1, daysInPrevMonth))
+        for (let s = dayInPrevMonth; s > 0; s--) {
+            let span = bel`<div class=${css['day-prev']} role="presentation" aria-label aria-disabled="false"></div>`
+            el.append((span))
+        }
+    }
+
+}
+
+const css = csjs`
+.calendar-days {
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: repeat(7, minmax(30px, auto));
+    justify-items: center;
+}
+button {
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+.day {
+    display: grid;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    transition: color 0.25s, background-color 0.25s ease-in-out;
+}
+.day:hover {
+    color: #fff;
+    background-color: #000;
+}
+.today {
+    background-color: #f2f2f2;
+}
+.date-selected, .date-selected:hover {
+    color: #fff;
+    background-color: #000;
+}
+.day-prev {}
+.disabled-day, .disabled-day:hover {
+    color: #BBBBBB;
+    background: none;
+    cursor: default;
+}
+.date-in-range {
+    color: #000;
+    background-color: #EAEAEA;
+}
+`
+}).call(this)}).call(this,"/src/node_modules/datdot-ui-calendar-days.js")
+},{"bel":3,"csjs-inject":6,"date-fns":149,"message-maker":299}],305:[function(require,module,exports){
+(function (__filename){(function (){
+const bel = require('bel')
+const csjs = require('csjs-inject')
+const { format, setMonth, getMonth, getYear, getDaysInMonth } = require('date-fns')
+const message_maker = require('message-maker')
+const icon = require('datdot-ui-icon')
+
+var id = 0
+var counter = 0
+
+module.exports = datdot_ui_calendar_month
+
+function datdot_ui_calendar_month({from, getDate = new Date(), type = 'click', status = 'init', view = 'default'}, parent_protocol) {
 // -----------------------------------
   const myaddress = `${__filename}-${id++}`
   const inbox = {}
@@ -22237,86 +22926,106 @@ function datdot_ui_timeline_days({from = 'Default', data = null, style}, parent_
 
   }
 // -----------------------------------
+    let path = 'https://raw.githubusercontent.com/datdotorg/datdot-ui-icon/7f9b4be67c8df3935a93c727f51714c07c9f770d/src/svg/'
+    const { make } = recipients['parent']
+    const date = getDate
+    let year = getYear(date)
+    let current = getMonth(date)
+    // get Capital month
+    let month = format( new Date(year, current), 'MMMM')
 
-  const { make } = recipients['parent']
-  const date = new Date()
-  const today = getDate(date)
+    // elements
+    const title = bel`<h3 class=${css.title}>${month} ${year}</h3>`
+    const iconPrev = icon({ name: 'arrow-left', path, theme: { style: `${css.icon} ${css['icon-prev']}` } }, make_protocol(`icon-${counter++}`) )
+    const iconNext = icon({ name: 'arrow-right' , path, theme: { style: `${css.icon} ${css['icon-next']}` } }, make_protocol(`icon-${counter++}`) )
+    const prev  = bel`<button role="button" aria-label="Previous month" class="${css.btn} ${css.prev}" onclick=${()=>trigger(prev)}>${iconPrev}</button>`
+    const next = bel`<button role="button" aria-label="Next month" class="${css.btn} ${css.next}" onclick=${()=>trigger(next)}>${iconNext}</button>`
 
-  if ( data === null ) {
-      // if no data
-      var count = getMonth(date) // initial month
-      var month = format(date, 'MMMM') // get capitalization month
-      var year = getYear(date) // initial year
-      var days = getDaysInMonth(date) // initial days
-  } else {
-      // if data is loaded
-      var { from, count, month, year, days } = data
-  }
+    if ( view === 'datepicker-multiple-days' || view === 'datepicker-range-days') {
+        var el = bel`<div class=${css["datepicker-header"]}>${title}</div>`
+    } else { // default status
+        var el = bel`<div class=${css["calendar-header"]}>${prev}${title}${next}</div>`
+    }
+    return el
 
-  const is_today = (d) => isToday(new Date(year, count, d)) 
-  const el = bel`<section role="timeline-days" class=${style}></section>`
+    function updateMonth(m, y) {
+        return title.innerHTML = `${m} ${y}`
+    }
 
-  for (let d = 1; d <= days; d++ ) {
-      let date = format(new Date(year, count, d), 'd MMMM  yyyy, EEEE')
-      let setDate = format(new Date(year, count, d), 'yyyy-M-d')
-      
-      if (d < today && count <= new Date().getMonth() && year <= new Date().getFullYear() ) {
-          var day = bel`<div role="button" class="${css['timeline-day']} ${css['disabled-date']}" tabindex="-1" aria-today=${is_today(d)} aria-label="${date}" data-date="${setDate}">${d}</div>`
-      } else if ( count < new Date().getMonth() && year <= new Date().getFullYear() ) {
-          var day = bel`<div role="button" class="${css['timeline-day']} ${css['disabled-date']}" tabindex="-1" aria-today=${is_today(d)} aria-label="${date}" data-date="${setDate}">${d}</div>`
-      } else if ( year < new Date().getFullYear()) {
-          var day = bel`<div role="button" class="${css['timeline-day']} ${css['disabled-date']}" tabindex="-1" aria-today=${is_today(d)} aria-label="${date}" data-date="${setDate}">${d}</div>`
-      }
-        else {
-          var day = bel`<div role="button" class="${css['timeline-day']} ${is_today(d) ? `${css.today} ${css['date-selected']}` : ''}" tabindex="-1" aria-today=${is_today(d)} aria-label="${date}" aria-selected="${is_today(d)}" data-date="${setDate}" onclick=${(el) => onclick( el.target, setDate )}>${d}</div>`
-      }
-      el.append(day)
-  }
+    function trigger (target) {
+        if (target.classList.contains(css.prev)) {
+            var body = 'prev month'
+            // decrement month
+            current -= 1
+        } else {
+            var body = 'next month'
+            // increment month
+            current += 1
+        }
 
-  return el
+        let date = setMonth(new Date(), current)
+        let year = getYear(date)
+        let month = format(date, 'MMMM')
 
-  function onclick(target, date) {
-    const children = [...el.children]
-    children.forEach( btn => {
-        btn.classList.remove(css['date-selected'])
-        btn.removeAttribute('aira-selected')
-    })
+        updateMonth(month, year)
+       
+        // send message to parent component
+        notify(make({ to: address, type, data: { status, body, result }}))
+    } 
 
-    target.classList.add(css['date-selected'])
-    target.setAttribute('aria-selected', true)
-    return notify(make({ to: address, type: 'click', data: { body: date, count, month, year, days }}))
-  }
 }
 
 const css = csjs`
-.timeline-day {
-    text-align: center;
-    padding: 8px;
+.calendar-header {
+    display: grid;
+    grid-template-rows: auto;
+    grid-template-columns: minmax(25px, 30px) auto minmax(25px, 30px);
+    align-items: center;
+}
+.datepicker-header {
+    display: grid;
+    grid-template-rows: 30px;
+    grid-template-columns: auto;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.datepicker-header > h3 {
+    margin: 0;
+}
+.btn {
+    background: none;
+    border: none;
+    border-radius: 50px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    transition: background-color 0.3s ease-in-out;
     cursor: pointer;
-    transition: color 0.25s, background-color 0.25s ease-in-out;
 }
-.timeline-day:hover {
-    color: #fff;
-    background-color: #212121;
+.btn:active, .btn:hover {
+    background-color: #C9C9C9;
 }
-.timeline-day:focus, .timeline-day:active {
-    outline: dotted 1px #c9c9c9;
+.btn:active div > svg path, .btn:hover div > svg path {
+    
 }
-.today {
-    background-color: #f2f2f2;
+.prev {
+
 }
-.date-selected {
-    color: #fff;
-    background-color: #000;
+.next {
+
 }
-.disabled-date {
-    color: #BBBBBB;
-    cursor: default;
+.icon svg path {
+    transition: stroke 0.25s ease-in-out;
 }
-.disabled-date:hover {
-    color: #BBBBBB;
-    background: none; 
+.icon-prev {
+
+}
+.icon-next {
+
+}
+.title {
+    text-align: center;
 }
 `
-}).call(this)}).call(this,"/src/index.js")
-},{"bel":3,"csjs-inject":6,"date-fns":149,"message-maker":296}]},{},[1]);
+}).call(this)}).call(this,"/src/node_modules/datdot-ui-calendar-month.js")
+},{"bel":3,"csjs-inject":6,"datdot-ui-icon":296,"date-fns":149,"message-maker":299}]},{},[1]);

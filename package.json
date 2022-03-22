@@ -32,6 +32,7 @@
     "bel": "^6.0.0",
     "csjs-inject": "^1.0.1",
     "date-fns": "^2.28.0",
-    "message-maker": "github:datdotorg/message-maker"
+    "message-maker": "github:datdotorg/message-maker",
+    "datdot-ui-icon": "git+https://github.com/datdotorg/datdot-ui-icon.git"
   }
 }
