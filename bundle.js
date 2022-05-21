@@ -1,8 +1,7 @@
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
-(function (__filename){(function (){
 const csjs = require('csjs-inject')
 const bel = require('bel')
-const message_maker = require('message-maker')
+const protocol_maker = require('protocol-maker')
 
 const { isBefore, getYear, getMonth, getDaysInMonth } = require('date-fns')
 const calendarMonth = require('../src/node_modules/datdot-ui-calendar-month')
@@ -12,27 +11,15 @@ var id = 0
 
 function demo () {
 // ------------------------------------
-    const myaddress = `${__filename}-${id++}`
-    const inbox = {}
-    const outbox = {}
-    const recipients = {}
-    const names = {}
-    const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
+    const contacts = protocol_maker('demo', listen)
 
-    function make_protocol (name) {
-        return function protocol (address, notify) {
-            names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
-            return { notify: listen, address: myaddress }
-        }
-    }
     function listen (msg) {
         console.log('DEMO', { msg })
         const { head, refs, type, data, meta } = msg // receive msg
-        inbox[head.join('/')] = msg                  // store msg
         const [from] = head
         // send back ack
-        const { notify: from_notify, make: from_make, address: from_address } = names[from]
-        from_notify(from_make({ to: from_address, type: 'ack', refs: { 'cause': head } }))
+        const $name = contacts.by_address[from]
+        $name.notify($name.make({ to: $name.address, type: 'ack', refs: { 'cause': head } }))
     }
 // ------------------------------------
 
@@ -50,9 +37,9 @@ function demo () {
     let counter = 0
 
     // SUB COMPONENTS
-    const calendarmonth1 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
-    const calendarmonth2 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
-    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, make_protocol(`datepicker-${counter++}`))
+    const calendarmonth1 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
+    const calendarmonth2 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
+    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, contacts.add(`datepicker-${counter++}`))
 
     const weekday = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
     const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -170,8 +157,7 @@ button:active, button:focus {
 `
 
 document.body.append(demo())
-}).call(this)}).call(this,"/demo/demo.js")
-},{"..":303,"../src/node_modules/datdot-ui-calendar-month":305,"bel":3,"csjs-inject":6,"date-fns":149,"message-maker":299}],2:[function(require,module,exports){
+},{"..":304,"../src/node_modules/datdot-ui-calendar-month":306,"bel":3,"csjs-inject":6,"date-fns":149,"protocol-maker":300}],2:[function(require,module,exports){
 var trailingNewlineRegex = /\n[\s]+$/
 var leadingNewlineRegex = /^\n[\s]+/
 var trailingSpaceRegex = /[\s]+$/
@@ -405,7 +391,7 @@ module.exports = hyperx(belCreateElement, {comments: true})
 module.exports.default = module.exports
 module.exports.createElement = belCreateElement
 
-},{"./appendChild":2,"hyperx":301}],4:[function(require,module,exports){
+},{"./appendChild":2,"hyperx":302}],4:[function(require,module,exports){
 (function (global){(function (){
 'use strict';
 
@@ -424,7 +410,7 @@ function csjsInserter() {
 module.exports = csjsInserter;
 
 }).call(this)}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"csjs":9,"insert-css":302}],5:[function(require,module,exports){
+},{"csjs":9,"insert-css":303}],5:[function(require,module,exports){
 'use strict';
 
 module.exports = require('csjs/get-css');
@@ -21993,6 +21979,139 @@ module.exports = function message_maker (from) {
   }
 }
 },{}],300:[function(require,module,exports){
+// const path = require('path')
+// const filename = path.basename(__filename)
+const message_maker = require('message-maker')
+// const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
+
+module.exports = protocol_maker
+
+const routes = {}
+var id = 0
+
+function protocol_maker (type, listen, initial_contacts = {}) {
+  if (!type || typeof type !== 'string') throw new Error('invalid type')
+  const myaddress = id++
+
+  const inbox = {}
+  const outbox = {}
+
+  const by_name = {}
+  const by_address = {}
+  const contacts = { add, by_name, by_address, cut, on }
+  
+  const keys = Object.keys(initial_contacts)
+  for (var i = 0, len = keys.length; i < len; i++) {
+    const name = keys[i]
+    const wire = initial_contacts[name]
+    // @INFO: perspective of sub instance:
+    const { notify, address } = wire(myaddress, wrap_listen(listen))    
+    const contact = {
+      name,
+      address,
+      // path: `${myaddress}/${name}`,
+      notify: wrap_notify(notify),
+      make: message_maker(myaddress)
+    }
+    by_name[name] = by_address[address] = contact // new Promise(resolve => resolve(contact))
+  }
+  return contacts
+  function on (listener) {
+    // @NOTE: to listen to any "default protocol events" supported by any protocol, e.g. help
+    // maybe also: 'connect', or 'disconnect'
+    throw new Error ('`on` is not yet implemented')
+    return function off () {}
+  }
+  function cut (wire) { throw new Error ('`cut` is not yet implemented')}
+  function add (name) {
+    // @INFO: perspective of instance:
+    if (!name || typeof name !== 'string') throw new Error('invalid name')
+    if (by_name[name]) throw new Error('name already exists')
+    const wait = {}
+    by_name[name] = { name, make: message_maker(myaddress) } // new Promise((resolve, reject) => { wait.resolve = resolve; wait.reject = reject })
+    return function wire (address, notify) {
+      const contact = {
+        // @TODO: add queryable "routes" and allow lookup `by_route[route]`       
+        name, // a nickname dev gives to a component
+        address, // an address app makes for each component
+        // TODO: address will become "name" (like type) compared to nickname
+        // address: something new, based on e.g. filepath or browserified bundle.js:22:42 etc.. to give actual globally unique identifier
+        notify: wrap_notify(notify),
+        make: message_maker(myaddress)
+      }
+      // wait.resolve(contact)
+      by_name[name].address = address
+      by_name[name].notify = wrap_notify(notify)
+      by_address[address] = contact // new Promise(resolve => resolve(contact))
+      return { notify: wrap_listen(listen), address: myaddress }
+    }
+  }
+  function wrap_notify (notify) {
+    return message => {
+      outbox[message.head.join('/')] = message  // store message
+      return notify(message)
+    }
+  }
+  function wrap_listen (listen) {
+    return message => {
+      inbox[message.head.join('/')] = message  // store message
+      return listen(message)
+    }
+  }
+}
+/*
+const name_routes = [
+  "root/",
+  "root/el:demo/",
+  "root/el:demo/cpu:range-slider/",
+  "root/el:demo/cpu:range-slider/%:input-number/",
+  "root/el:demo/ram:range-slider/",
+  "root/el:demo/ram:range-slider/GB:input-number/",
+  "root/el:demo/upload:range-slider/",
+  "root/el:demo/upload:range-slider/MB:input-number/",
+  "root/el:demo/download:range-slider/",
+  "root/el:demo/download:range-slider/MB:input-number/",  
+]
+// --------------------------------------------------
+const name_routes = {
+    root: {
+        "el:demo": {
+            "cpu:range-slider": {
+                "%:input-number": {}
+            },
+            "ram:range-slider": {
+                "GB:input-number": {}
+            },
+            "download:range-slider": {
+                "MB:input-number": {}
+            },
+            "upload:range-slider": {
+                "MB:input-number": {}
+            },
+        },
+    },
+}
+// --------------------------------------------------
+const name_routes = {
+    root: {
+        "el": {
+            "cpu": {
+                "%": {}
+            },
+            "ram": {
+                "GB": {}
+            },
+            "download": {
+                "MB": {}
+            },
+            "upload": {
+                "MB": {}
+            },
+        },
+    },
+}
+*/
+},{"message-maker":299}],301:[function(require,module,exports){
 module.exports = attributeToProperty
 
 var transform = {
@@ -22013,7 +22132,7 @@ function attributeToProperty (h) {
   }
 }
 
-},{}],301:[function(require,module,exports){
+},{}],302:[function(require,module,exports){
 var attrToProp = require('hyperscript-attribute-to-property')
 
 var VAR = 0, TEXT = 1, OPEN = 2, CLOSE = 3, ATTR = 4
@@ -22310,7 +22429,7 @@ var closeRE = RegExp('^(' + [
 ].join('|') + ')(?:[\.#][a-zA-Z0-9\u007F-\uFFFF_:-]+)*$')
 function selfClosing (tag) { return closeRE.test(tag) }
 
-},{"hyperscript-attribute-to-property":300}],302:[function(require,module,exports){
+},{"hyperscript-attribute-to-property":301}],303:[function(require,module,exports){
 var inserted = {};
 
 module.exports = function (css, options) {
@@ -22334,11 +22453,10 @@ module.exports = function (css, options) {
     }
 };
 
-},{}],303:[function(require,module,exports){
-(function (__filename){(function (){
+},{}],304:[function(require,module,exports){
 const bel = require('bel')
 const csjs = require('csjs-inject')
-const message_maker = require('message-maker')
+const protocol_maker = require('protocol-maker')
 const foo = require('date-fns')
 // debugger
 const { isPast, isFuture, setMonth, getYear, getMonth, format, getDaysInMonth } = require('date-fns')
@@ -22351,7 +22469,7 @@ var id = 0
 
 module.exports = datepicker
 
-function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, parent_protocol) {
+function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, parent_wire) {
   
   let name1 = 'calendar1'
   let name2 = 'calendar2'
@@ -22360,49 +22478,32 @@ function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, 
   let counter = 0
   
   // -----------------------------------
-  const myaddress = `${__filename}-${id++}`
-  const inbox = {}
-  const outbox = {}
-  const recipients = {}
-  const names = {}
-  const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
-
-  const {notify, address} = parent_protocol(myaddress, listen)
-  names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
-  notify(recipients['parent'].make({ to: address, type: 'ready', refs: {} }))
-  
-  function make_protocol (name) {
-    return function protocol (address, notify) {
-      console.log('PROTOCOL INIT', { name, address })
-      names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
-      return { notify: listen, address: myaddress }
-    }
-  }
+  const initial_contacts = { 'parent': parent_wire }
+  const contacts = protocol_maker('input-number', listen, initial_contacts)
   
   function listen (msg) {
     const { head, refs, type, data, meta } = msg // receive msg
-    inbox[head.join('/')] = msg                  // store msg
     const [from] = head
-    console.log('DATEPICKER', { type, from, name: names[from].name, msg, data })
+    console.log('DATEPICKER', { type, from, name: contacts.by_address[from].name, msg, data })
     // handlers
     if (type === 'value/first') return storeFirstAndNotify(from, data)
       if (type === 'value/second') return notifyParent(from, data)
       if (type === 'selecting-second') return notifyOtherCalenderSelectingLast(from)
-      if (type === 'cleared') return clearOther( names[from].name === name1 ? name2 : name1)
+      if (type === 'cleared') return clearOther( contacts.by_address[from].name === name1 ? name2 : name1)
       if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
     }
     // -----------------------------------
   let path = 'https://raw.githubusercontent.com/datdotorg/datdot-ui-icon/7f9b4be67c8df3935a93c727f51714c07c9f770d/src/svg/'
-  const { make } = recipients['parent']
+  const { make } = contacts.by_name['parent']
 
   // elements
-  let cal1 = calendarDays({name: name1, month: month1[1], days: month1[2], year: month1[0], status }, make_protocol(name1))
-  let cal2 = calendarDays({name: name2, month: month2[1], days: month2[2], year: month2[0], status }, make_protocol(name2))
+  let cal1 = calendarDays({name: name1, month: month1[1], days: month1[2], year: month1[0], status }, contacts.add(name1))
+  let cal2 = calendarDays({name: name2, month: month2[1], days: month2[2], year: month2[0], status }, contacts.add(name2))
   const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const title1 = calendarMonth({ getDate: new Date(month1[0], month1[1]), view: 'datepicker-range-days'}, make_protocol(`cal-month-${counter++}`))
-  const title2 = calendarMonth({ getDate: new Date(month2[0], month2[1]), view: 'datepicker-range-days'}, make_protocol(`cal-month-${counter++}`))
-  const iconPrev = icon({ theme: { style: `${css.icon} ${css['icon-prev']}` }, name: 'arrow-left', path }, make_protocol(`icon-${counter++}`) )
-  const iconNext = icon({ theme: { style: `${css.icon} ${css['icon-next']}` }, name: 'arrow-right', path }, make_protocol(`icon-${counter++}`) )
+  const title1 = calendarMonth({ getDate: new Date(month1[0], month1[1]), view: 'datepicker-range-days'}, contacts.add(`cal-month-${counter++}`))
+  const title2 = calendarMonth({ getDate: new Date(month2[0], month2[1]), view: 'datepicker-range-days'}, contacts.add(`cal-month-${counter++}`))
+  const iconPrev = icon({ theme: { style: `${css.icon} ${css['icon-prev']}` }, name: 'arrow-left', path }, contacts.add(`icon-${counter++}`) )
+  const iconNext = icon({ theme: { style: `${css.icon} ${css['icon-next']}` }, name: 'arrow-right', path }, contacts.add(`icon-${counter++}`) )
   const prevMonth  = bel`<button role="button" aria-label="Previous month" class="${css.btn} ${css.prev}" onclick=${triggerPreviousMonth}>${iconPrev}</button>`
   const nextMonth = bel`<button role="button" aria-label="Next month" class="${css.btn} ${css.next}" onclick=${triggerNextMonth}>${iconNext}</button>`
   const container = bel`<div class=${css['calendar-container']}></div>`
@@ -22418,14 +22519,14 @@ function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, 
     const prevCal1 = monthResult(count)
     const prevCal2 = monthResult(count + 1)
 
-    const { notify: name_1_notify, address: name_1_address, make: name_1_make } = recipients[name1]
-    const ca1 = name_1_notify(name_1_make({ to: name_1_address, type: 'change', data: { body: prevCal1 } }))
+    const $name_1 = contacts.by_name[name1]
+    const ca1 = $name_1.notify($name_1.make({ to: $name_1.address, type: 'change', data: { body: prevCal1 } }))
 
-    const { notify: name_2_notify, address: name_2_address, make: name_2_make } = recipients[name2]
-    const ca2 = name_2_notify(name_2_make({ to: name_2_address, type: 'change', data: { body: prevCal2 } }))
+    const $name_2 = contacts.by_name[name2]
+    const ca2 = $name_2.notify($name_2.make({ to: $name_2.address, type: 'change', data: { body: prevCal2 } }))
     
-    const month1Title = calendarMonth({from: name, getDate: new Date(prevCal1.year, prevCal1.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
-    const month2Title = calendarMonth({from: name, getDate: new Date(prevCal2.year, prevCal2.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    const month1Title = calendarMonth({from: name, getDate: new Date(prevCal1.year, prevCal1.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
+    const month2Title = calendarMonth({from: name, getDate: new Date(prevCal2.year, prevCal2.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
     container.innerHTML = ''
     container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
 
@@ -22437,13 +22538,13 @@ function triggerNextMonth () {
     const nextCal1 = monthResult(count)
     const nextCal2 = monthResult(count + 1)
 
-    const { notify: name_1_notify, address: name_1_address, make: name_1_make } = recipients[name1]
-    const ca1 = name_1_notify(name_1_make({ to: name_1_address, type: 'change', data: { body: nextCal1 } }))
+    const $name_1 = contacts.by_name[name1]
+    const ca1 = $name_1.notify($name_1.make({ to: $name_1.address, type: 'change', data: { body: nextCal1 } }))
 
-    const { notify: name_2_notify, address: name_2_address, make: name_2_make } = recipients[name2]
-    const ca2 = name_2_notify(name_2_make({ to: name_2_address, type: 'change', data: { body: nextCal2 } }))
-    const month1Title = calendarMonth({from: name, getDate: new Date(nextCal1.year, nextCal1.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
-    const month2Title = calendarMonth({from: name, getDate: new Date(nextCal2.year, nextCal2.count), view: 'datepicker-range-days'}, make_protocol(`calendar-month-${counter++}`))
+    const $name_2 = contacts.by_name[name2]
+    const ca2 = $name_2.notify($name_2.make({ to: $name_2.address, type: 'change', data: { body: nextCal2 } }))
+    const month1Title = calendarMonth({from: name, getDate: new Date(nextCal1.year, nextCal1.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
+    const month2Title = calendarMonth({from: name, getDate: new Date(nextCal2.year, nextCal2.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
     container.innerHTML = ''
     container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
     
@@ -22473,42 +22574,44 @@ function triggerNextMonth () {
   //////
   
   function forwardMessage ({from, type, data = {}}) {
-    let keys = Object.keys(recipients)
-    if (from) keys = keys.filter(key => key !== names[from].name) // notify all other children
+    let keys = Object.keys(contacts.by_name)
+    if (from) keys = keys.filter(key => key !== contacts.by_address[from].name) // notify all other children
     broadcast(keys, type, data)
   }
 
   function clearOther (name) {
-    const { notify: name_notify, make: name_make, address: name_address } = recipients[name]
-      name_notify(name_make({ to: name_address, type: 'clear' }))
+      const $name = contacts.by_name[name]
+      $name.notify($name.make({ to: $name.address, type: 'clear' }))
   }
 
   function notifyParent (from, data) {
       value.second = data.body
-      notify(make({ to: address, type: 'value/second', data: { body: value } } ))
+      const $parent = contacts.by_name['parent']
+      $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: value } } ))
   }
 
   function notifyOtherCalenderSelectingLast (from) {
-      const { notify: from_notify, make: from_make, address: from_address } = names[from]
+      const $from = contacts.by_address[from]
       let type
-      if (names[from].name === name1) type = 'color-from-start'
-      if (names[from].name === name2) type = 'color-to-end'
-      from_notify(from_make({ to: from_address, type }))
+      if (contacts.by_address[from].name === name1) type = 'color-from-start'
+      if (contacts.by_address[from].name === name2) type = 'color-to-end'
+      $from.notify($from.make({ to: $from.address, type }))
   }
 
   function storeFirstAndNotify (from, data) {
       value.first = data.body
-      const type = names[from].name === name1 ? 'first-selected-by-startcal' : 'first-selected-by-endcal'
-      const keys = Object.keys(recipients).filter(key => key !== names[from].name) // notify all other children
-      notify(make({ to: address, type: 'value/first', date: { data } } ))
+      const type = contacts.by_address[from].name === name1 ? 'first-selected-by-startcal' : 'first-selected-by-endcal'
+      const keys = Object.keys(contacts.by_name).filter(key => key !== contacts.by_address[from].name) // notify all other children
+      const $parent = contacts.by_name['parent']
+      $parent.notify($parent.make({ to: $parent.address, type: 'value/first', date: { data } } ))
       broadcast(keys, type, data)
   }
 
   function broadcast (keys, type, data) {
     for ( let i = 0, len = keys.length; i < len; i++) {
       const key = keys[i]
-        const { notify: from_notify, make: from_make, address: from_address } = recipients[key]
-        from_notify(from_make({ to: from_address, type, data }))
+        const $key = contacts.by_name[key]
+        $key.notify($key.make({ to: $key.address, type, data }))
     }
   }
 
@@ -22573,45 +22676,26 @@ const css = csjs`
     text-align: center;
 }
 `
-}).call(this)}).call(this,"/src/index.js")
-},{"bel":3,"csjs-inject":6,"datdot-ui-calendar-days":304,"datdot-ui-calendar-month":305,"datdot-ui-icon":296,"date-fns":149,"message-maker":299}],304:[function(require,module,exports){
-(function (__filename){(function (){
+},{"bel":3,"csjs-inject":6,"datdot-ui-calendar-days":305,"datdot-ui-calendar-month":306,"datdot-ui-icon":296,"date-fns":149,"protocol-maker":300}],305:[function(require,module,exports){
 const bel = require('bel')
 const csjs = require('csjs-inject')
 const { isToday, format, isPast, getDay, getDate, getMonth, getYear, getDaysInMonth } = require('date-fns')
-const message_maker = require('message-maker')
+const protocol_maker = require('protocol-maker')
 
 var id = 0
 
 module.exports = calendarDays
 
-function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'}, parent_protocol) {
+function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'}, parent_wire) {
 
 // -----------------------------------
-  const myaddress = `${__filename}-${id++}`
-  const inbox = {}
-  const outbox = {}
-  const recipients = {}
-  const names = {}
-  const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
-
-  const {notify, address} = parent_protocol(myaddress, listen)
-  names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
-  notify(recipients['parent'].make({ to: address, type: 'ready', refs: {} }))
-
-  function make_protocol (name) {
-      return function protocol (address, notify) {
-          console.log('PROTOCOL INIT', { name, address })
-          names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
-          return { notify: listen, address: myaddress }
-      }
-  }
+    const initial_contacts = { 'parent': parent_wire }
+    const contacts = protocol_maker('input-number', listen, initial_contacts)
 
   function listen (msg) {
       const { head, refs, type, data, meta } = msg // receive msg
-      inbox[head.join('/')] = msg                  // store msg
       const [from] = head
-      console.log('CALENDAR DAYS LISTENS', { type, from, name: names[from].name, msg, data })
+      console.log('CALENDAR DAYS LISTENS', { type, from, name: contacts.by_address[from].name, msg, data })
       // handlers
       if (type === 'clear') return actionClear()
       if (type === 'selecting-second') return actionSelectingSecond(data.body)
@@ -22636,14 +22720,14 @@ function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'
     calendar.onmouseleave = onmouseleave
     calendar.onmouseenter = onmouseenter
 
-    const { make } = recipients['parent']
+    const $parent = contacts.by_name['parent']
 
     return calendar
 
     function setStatus( nextStatus ) {
         console.log('setStatus', JSON.stringify({ type: 'status', data: { body: nextStatus } }, 0, 2))
         status = nextStatus
-        notify(make({ to: address, type: 'status', data: { status: nextStatus } }))
+        $parent.notify($parent.make({ to: $parent.address, type: 'status', data: { status: nextStatus } }))
     }
 
     function actionRenderNewCalendars(body) {
@@ -22684,11 +22768,11 @@ function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'
 
     function clearAndNotify () {
       clearSelf()
-      notify(make({ to: address, type: 'not-selecting-second', data: { body: '' } }))
+      $parent.notify($parent.make({ to: $parent.address, type: 'not-selecting-second', data: { body: '' } }))
     }
       
     function notifyOther () {
-      notify(make({ to: address, type: 'selecting-second' }))
+        $parent.notify($parent.make({ to: $parent.address, type: 'selecting-second' }))
     }
 
     function onlyKeepFirst () {
@@ -22758,17 +22842,17 @@ function calendarDays({ name = 'calendar', month, days, year, status = 'cleared'
     function selectSecond (btn, current) {
         second = current
         setStatus('second-selected-by-self')
-        notify(make({ to: address, type: 'second-selected' }))
-        return notify(make({ to: address, type: 'value/second', data: { body: [nowYear, nowMonth+1, second] } }))
+        $parent.notify($parent.make({ to: $parent.address, type: 'second-selected' }))
+        return $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: [nowYear, nowMonth+1, second] } }))
     }
 
     function selectFirst (btn, current) {
         clearSelf()
-        notify(make({ to: address, type: 'cleared' })) // notify parent to notify other cal to clear itself too
+        $parent.notify($parent.make({ to: $parent.address, type: 'cleared' })) // notify parent to notify other cal to clear itself too
         first = current
         btn.classList.add(css['date-selected'])
         setStatus('first-selected-by-self')
-        return notify(make({ to: address, type: 'value/first', data: { body: [nowYear, nowMonth+1, first] } }))
+        return $parent.notify($parent.make({ to: $parent.address, type: 'value/first', data: { body: [nowYear, nowMonth+1, first] } }))
     }
 
     function markRange (btn, A, B) {
@@ -22882,13 +22966,11 @@ button {
     background-color: #EAEAEA;
 }
 `
-}).call(this)}).call(this,"/src/node_modules/datdot-ui-calendar-days.js")
-},{"bel":3,"csjs-inject":6,"date-fns":149,"message-maker":299}],305:[function(require,module,exports){
-(function (__filename){(function (){
+},{"bel":3,"csjs-inject":6,"date-fns":149,"protocol-maker":300}],306:[function(require,module,exports){
 const bel = require('bel')
 const csjs = require('csjs-inject')
 const { format, setMonth, getMonth, getYear, getDaysInMonth } = require('date-fns')
-const message_maker = require('message-maker')
+const protocol_maker = require('protocol-maker')
 const icon = require('datdot-ui-icon')
 
 var id = 0
@@ -22896,38 +22978,21 @@ var counter = 0
 
 module.exports = datdot_ui_calendar_month
 
-function datdot_ui_calendar_month({from, getDate = new Date(), type = 'click', status = 'init', view = 'default'}, parent_protocol) {
+function datdot_ui_calendar_month({from, getDate = new Date(), type = 'click', status = 'init', view = 'default'}, parent_wire) {
 // -----------------------------------
-  const myaddress = `${__filename}-${id++}`
-  const inbox = {}
-  const outbox = {}
-  const recipients = {}
-  const names = {}
-  const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
-
-  const {notify, address} = parent_protocol(myaddress, listen)
-  names[address] = recipients['parent'] = { name: 'parent', notify, address, make: message_maker(myaddress) }
-  notify(recipients['parent'].make({ to: address, type: 'ready', refs: {} }))
-
-  function make_protocol (name) {
-      return function protocol (address, notify) {
-          console.log('PROTOCOL INIT', { name, address })
-          names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
-          return { notify: listen, address: myaddress }
-      }
-  }
+  const initial_contacts = { 'parent': parent_wire }
+  const contacts = protocol_maker('input-number', listen, initial_contacts)
 
   function listen (msg) {
       const { head, refs, type, data, meta } = msg // receive msg
-      inbox[head.join('/')] = msg                  // store msg
       const [from] = head
-      console.log('TIMELINE DAYS', { type, from, name: names[from].name, msg, data })
+      console.log('TIMELINE DAYS', { type, from, name: contacts.by_address[from].name, msg, data })
       // handlers
 
   }
 // -----------------------------------
     let path = 'https://raw.githubusercontent.com/datdotorg/datdot-ui-icon/7f9b4be67c8df3935a93c727f51714c07c9f770d/src/svg/'
-    const { make } = recipients['parent']
+    const $parent = contacts.by_name['parent']
     const date = getDate
     let year = getYear(date)
     let current = getMonth(date)
@@ -22936,8 +23001,8 @@ function datdot_ui_calendar_month({from, getDate = new Date(), type = 'click', s
 
     // elements
     const title = bel`<h3 class=${css.title}>${month} ${year}</h3>`
-    const iconPrev = icon({ name: 'arrow-left', path, theme: { style: `${css.icon} ${css['icon-prev']}` } }, make_protocol(`icon-${counter++}`) )
-    const iconNext = icon({ name: 'arrow-right' , path, theme: { style: `${css.icon} ${css['icon-next']}` } }, make_protocol(`icon-${counter++}`) )
+    const iconPrev = icon({ name: 'arrow-left', path, theme: { style: `${css.icon} ${css['icon-prev']}` } }, contacts.add(`icon-${counter++}`) )
+    const iconNext = icon({ name: 'arrow-right' , path, theme: { style: `${css.icon} ${css['icon-next']}` } }, contacts.add(`icon-${counter++}`) )
     const prev  = bel`<button role="button" aria-label="Previous month" class="${css.btn} ${css.prev}" onclick=${()=>trigger(prev)}>${iconPrev}</button>`
     const next = bel`<button role="button" aria-label="Next month" class="${css.btn} ${css.next}" onclick=${()=>trigger(next)}>${iconNext}</button>`
 
@@ -22970,7 +23035,7 @@ function datdot_ui_calendar_month({from, getDate = new Date(), type = 'click', s
         updateMonth(month, year)
        
         // send message to parent component
-        notify(make({ to: address, type, data: { status, body, result }}))
+        $parent.notify($parent.make({ to: $parent.address, type, data: { status, body }}))
     } 
 
 }
@@ -23027,5 +23092,4 @@ const css = csjs`
     text-align: center;
 }
 `
-}).call(this)}).call(this,"/src/node_modules/datdot-ui-calendar-month.js")
-},{"bel":3,"csjs-inject":6,"datdot-ui-icon":296,"date-fns":149,"message-maker":299}]},{},[1]);
+},{"bel":3,"csjs-inject":6,"datdot-ui-icon":296,"date-fns":149,"protocol-maker":300}]},{},[1]);

@@ -1,6 +1,6 @@
 const csjs = require('csjs-inject')
 const bel = require('bel')
-const message_maker = require('message-maker')
+const protocol_maker = require('protocol-maker')
 
 const { isBefore, getYear, getMonth, getDaysInMonth } = require('date-fns')
 const calendarMonth = require('../src/node_modules/datdot-ui-calendar-month')
@@ -10,27 +10,15 @@ var id = 0
 
 function demo () {
 // ------------------------------------
-    const myaddress = `${__filename}-${id++}`
-    const inbox = {}
-    const outbox = {}
-    const recipients = {}
-    const names = {}
-    const message_id = to => (outbox[to] = 1 + (outbox[to]||0))
+    const contacts = protocol_maker('demo', listen)
 
-    function make_protocol (name) {
-        return function protocol (address, notify) {
-            names[address] = recipients[name] = { name, address, notify, make: message_maker(myaddress) }
-            return { notify: listen, address: myaddress }
-        }
-    }
     function listen (msg) {
         console.log('DEMO', { msg })
         const { head, refs, type, data, meta } = msg // receive msg
-        inbox[head.join('/')] = msg                  // store msg
         const [from] = head
         // send back ack
-        const { notify: from_notify, make: from_make, address: from_address } = names[from]
-        from_notify(from_make({ to: from_address, type: 'ack', refs: { 'cause': head } }))
+        const $name = contacts.by_address[from]
+        $name.notify($name.make({ to: $name.address, type: 'ack', refs: { 'cause': head } }))
     }
 // ------------------------------------
 
@@ -48,9 +36,9 @@ function demo () {
     let counter = 0
 
     // SUB COMPONENTS
-    const calendarmonth1 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
-    const calendarmonth2 = calendarMonth({}, make_protocol(`cal-month-${counter++}`))
-    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, make_protocol(`datepicker-${counter++}`))
+    const calendarmonth1 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
+    const calendarmonth2 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
+    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, contacts.add(`datepicker-${counter++}`))
 
     const weekday = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
     const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']

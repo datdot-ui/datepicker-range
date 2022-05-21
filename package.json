@@ -31,7 +31,7 @@
   "dependencies": {
     "bel": "^6.0.0",
     "csjs-inject": "^1.0.1",
-    "message-maker": "github:datdotorg/message-maker",
+    "protocol-maker": "github:datdotorg/protocol-maker#v0.0.1-alpha",
     "date-fns": "^2.28.0",
     "datdot-ui-icon": "git+https://github.com/datdot-ui/icon.git#v0.0.1-alpha"
   }
