@@ -17,28 +17,45 @@ function demo () {
         const { head, refs, type, data, meta } = msg // receive msg
         const [from] = head
         // send back ack
-        const $name = contacts.by_address[from]
-        $name.notify($name.make({ to: $name.address, type: 'ack', refs: { 'cause': head } }))
+        const name = contacts.by_address[from].name
+        if (type === 'click') {
+            const { name: target } =  data
+            const $month1 = contacts.by_name['cal-header-0']
+            const $month2 = contacts.by_name['cal-header-1']
+            if (name === 'cal-header-0') {
+                if (target === 'prev') new_pos = current_state.cal_header_1.pos - 1
+                else if (target === 'next') new_pos = current_state.cal_header_1.pos + 1
+                current_state.cal_header_1.pos = new_pos
+                $month1.notify($month1.make({ to: $month1.address, type: 'update', data : { current: new_pos } }))
+            } else if (name === 'cal-header-1') {
+                if (target === 'prev') new_pos = current_state.cal_header_2.pos - 1
+                else if (target === 'next') new_pos = current_state.cal_header_2.pos + 1
+                current_state.cal_header_2.pos = new_pos
+                $month2.notify($month2.make({ to: $month2.address, type: 'update', data : { current: new_pos } }))
+            }
+        }
     }
 // ------------------------------------
 
     // init date
     const date = new Date()
     let year = getYear(date)
-    // get current month
-    let currentMonth = getMonth(date)
-    let currentDays = getDaysInMonth(date)
-    // get next month
-    let nextMonth = currentMonth+1
-    let nextDays = getDaysInMonth(new Date(year, nextMonth))
+    // first
+    let pos = getMonth(date)
+    let first_days = getDaysInMonth(date)
+    // second
+    let second_days = getDaysInMonth(new Date(year, pos + 1))
     // store data
-    let state = {}
+    let current_state = {
+        cal_header_1: { pos: 2 },
+        cal_header_2: { pos: 7 },
+    }
     let counter = 0
 
     // SUB COMPONENTS
-    const calendarmonth1 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
-    const calendarmonth2 = calendarMonth({}, contacts.add(`cal-month-${counter++}`))
-    const datepicker1 = datepicker({month1: [year, currentMonth, currentDays], month2: [year, nextMonth, nextDays] }, contacts.add(`datepicker-${counter++}`))
+    const cal_header1 = calendarMonth({ pos: current_state.cal_header_1.pos }, contacts.add(`cal-header-${counter++}`))
+    const cal_header2 = calendarMonth({ pos: current_state.cal_header_2.pos }, contacts.add(`cal-header-${counter++}`))
+    const cal1 = datepicker({ first:{ year, pos, days: first_days }, second: { year, pos: pos + 1, days: second_days } }, contacts.add(`cal-${counter++}`))
 
     const weekday = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
     const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -50,18 +67,17 @@ function demo () {
         <!--- ui-calendar-month start -->
         <div class=${css['ui-calendar-header']}>
           <h2 class=${css.title}>Calendar Header</h2>
-          <div class=${css["custom-header"]}>${calendarmonth1}</div>
-          <div class=${css["calendar-header-fullsize"]}>${calendarmonth2}</div>
+          <div class=${css["custom-header"]}>${cal_header1}</div>
+          <div class=${css["calendar-header-fullsize"]}>${cal_header2}</div>
         </div>
         <!--- // ui-calendar-month end -->
         <!--- ui-datepicker start -->
         <div class=${css['ui-datepicker']}>
           <h2 class=${css.title}>Date Picker</h2>
-          ${datepicker1}
+          ${cal1}
         </div>
         <!--- // ui-datepicker end -->
       </section>
-      <div class=${css.terminal}> </div>
     </div>`
 
   return el
@@ -85,20 +101,6 @@ button:active, button:focus {
     grid-template-columns: 1fr;
     grid-template-rows: 75vh 25vh;
     min-width: 520px
-}
-.terminal {
-    background-color: #212121;
-    color: #f2f2f2;
-    font-size: 13px;
-    padding: 0 20px;
-    overflow-y: auto;
-}
-.terminal div {
-    margin: 10px 0;
-}
-.terminal div:last-child {
-    color: #FFF500;
-    font-weight: bold;
 }
 .ui-widgets {
     padding: 20px;

@@ -4,7 +4,7 @@ const protocol_maker = require('protocol-maker')
 const foo = require('date-fns')
 // debugger
 const { isPast, isFuture, setMonth, getYear, getMonth, format, getDaysInMonth } = require('date-fns')
-const icon = require('datdot-ui-icon')
+const button = require('datdot-ui-button')
 // widgets
 const calendarDays = require('datdot-ui-calendar-days')
 const calendarMonth = require('datdot-ui-calendar-month')
@@ -13,13 +13,16 @@ var id = 0
 
 module.exports = datepicker
 
-function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, parent_wire) {
-  
+function datepicker (opts, parent_wire) {
+	
+	const { name = 'datepicker', first, second, status = 'cleared' } = opts
   let name1 = 'calendar1'
   let name2 = 'calendar2'
-  let count = month1[1]
   let value = {}
-  let counter = 0
+	const current_state = {
+		first: { pos: first.pos},
+		second:	{ pos: second.pos }
+	}
   
   // -----------------------------------
   const initial_contacts = { 'parent': parent_wire }
@@ -28,73 +31,31 @@ function datepicker ({name = 'datepicker', month1, month2, status = 'cleared'}, 
   function listen (msg) {
     const { head, refs, type, data, meta } = msg // receive msg
     const [from] = head
-    console.log('DATEPICKER', { type, from, name: contacts.by_address[from].name, msg, data })
-    // handlers
+    const name = contacts.by_address[from].name
+    console.log('DATEPICKER', { type, from, name, msg, data })
+		if (type === 'click') handle_click(name, data.name)
     if (type === 'value/first') return storeFirstAndNotify(from, data)
-      if (type === 'value/second') return notifyParent(from, data)
-      if (type === 'selecting-second') return notifyOtherCalenderSelectingLast(from)
-      if (type === 'cleared') return clearOther( contacts.by_address[from].name === name1 ? name2 : name1)
-      if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
-    }
-    // -----------------------------------
-  let path = 'https://raw.githubusercontent.com/datdotorg/datdot-ui-icon/7f9b4be67c8df3935a93c727f51714c07c9f770d/src/svg/'
-  const { make } = contacts.by_name['parent']
-
+    if (type === 'value/second') return notifyParent(from, data)
+    if (type === 'selecting-second') return notifyOtherCalendarSelectingLast(from)
+    if (type === 'cleared') return clearOther( contacts.by_address[from].name === name1 ? name2 : name1)
+    if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
+	}
+  
   // elements
-  let cal1 = calendarDays({name: name1, month: month1[1], days: month1[2], year: month1[0], status }, contacts.add(name1))
-  let cal2 = calendarDays({name: name2, month: month2[1], days: month2[2], year: month2[0], status }, contacts.add(name2))
+	
+  let cal1 = calendarDays({name: name1, month: first.pos, days: first.days, year: first.year, status }, contacts.add(name1))
+  let cal2 = calendarDays({name: name2, month: second.pos	, days: second.days, year: second.year, status }, contacts.add(name2))
   const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const title1 = calendarMonth({ getDate: new Date(month1[0], month1[1]), view: 'datepicker-range-days'}, contacts.add(`cal-month-${counter++}`))
-  const title2 = calendarMonth({ getDate: new Date(month2[0], month2[1]), view: 'datepicker-range-days'}, contacts.add(`cal-month-${counter++}`))
-  const iconPrev = icon({ theme: { style: `${css.icon} ${css['icon-prev']}` }, name: 'arrow-left', path }, contacts.add(`icon-${counter++}`) )
-  const iconNext = icon({ theme: { style: `${css.icon} ${css['icon-next']}` }, name: 'arrow-right', path }, contacts.add(`icon-${counter++}`) )
-  const prevMonth  = bel`<button role="button" aria-label="Previous month" class="${css.btn} ${css.prev}" onclick=${triggerPreviousMonth}>${iconPrev}</button>`
-  const nextMonth = bel`<button role="button" aria-label="Next month" class="${css.btn} ${css.next}" onclick=${triggerNextMonth}>${iconNext}</button>`
+  const month1 = calendarMonth({ getDate: new Date(first.year, first.pos), view: 'datepicker-range-days'}, contacts.add(`cal-month-1`))
+  const month2 = calendarMonth({ getDate: new Date(second.year, second.pos	), view: 'datepicker-range-days'}, contacts.add(`cal-month-2`))
+
   const container = bel`<div class=${css['calendar-container']}></div>`
 
-  container.append( calendarView(title1, cal1), calendarView(title2, cal2) )
+  container.append( calendarView(month1, cal1), calendarView(month2, cal2) )
 
-  return bel`<div class=${css.datepicker}> <div class=${css["calendar-header"]}>${prevMonth}${nextMonth}</div> ${container} </div>`
+  return bel`<div class=${css.datepicker}> <div class=${css["calendar-header"]}></div> ${container} </div>`
 
   function calendarView (title, calendar) { return  bel`<div class=${css.calendar}>${title}${makeWeekDays()}${calendar}</div>` }
-
-  function triggerPreviousMonth () {
-    count -= 2
-    const prevCal1 = monthResult(count)
-    const prevCal2 = monthResult(count + 1)
-
-    const $name_1 = contacts.by_name[name1]
-    const ca1 = $name_1.notify($name_1.make({ to: $name_1.address, type: 'change', data: { body: prevCal1 } }))
-
-    const $name_2 = contacts.by_name[name2]
-    const ca2 = $name_2.notify($name_2.make({ to: $name_2.address, type: 'change', data: { body: prevCal2 } }))
-    
-    const month1Title = calendarMonth({from: name, getDate: new Date(prevCal1.year, prevCal1.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
-    const month2Title = calendarMonth({from: name, getDate: new Date(prevCal2.year, prevCal2.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
-    container.innerHTML = ''
-    container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
-
-    const pastMonth = value.first ? isPast(new Date(prevCal1.year, prevCal1.count, prevCal1.days)) : undefined
-    if (pastMonth) return forwardMessage({ type: 'color-range-from-start' })
-}
-function triggerNextMonth () {
-    count += 2
-    const nextCal1 = monthResult(count)
-    const nextCal2 = monthResult(count + 1)
-
-    const $name_1 = contacts.by_name[name1]
-    const ca1 = $name_1.notify($name_1.make({ to: $name_1.address, type: 'change', data: { body: nextCal1 } }))
-
-    const $name_2 = contacts.by_name[name2]
-    const ca2 = $name_2.notify($name_2.make({ to: $name_2.address, type: 'change', data: { body: nextCal2 } }))
-    const month1Title = calendarMonth({from: name, getDate: new Date(nextCal1.year, nextCal1.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
-    const month2Title = calendarMonth({from: name, getDate: new Date(nextCal2.year, nextCal2.count), view: 'datepicker-range-days'}, contacts.add(`calendar-month-${counter++}`))
-    container.innerHTML = ''
-    container.append( calendarView(month1Title, ca1), calendarView(month2Title, ca2) )
-    
-    const nextMonth = value.first ? isFuture(new Date(nextCal1.year, nextCal1.count, nextCal1.days)) : undefined
-    if (nextMonth) return forwardMessage({ type: 'color-range-to-end' })
-}
 
   function makeWeekDays () {
       const el = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
@@ -105,17 +66,30 @@ function triggerNextMonth () {
       return el
   }
 
-  function monthResult(number) {
-    let date = setMonth(new Date(), number)
-    let year = getYear(date)
-    let count = getMonth(date)
-    let month = format(date, 'MMMM')
-    let days = getDaysInMonth(date)
-    const result = {count, year, month, days}
-    return result
-}
-
   //////
+
+	function handle_click (name, target) {
+		const $name1 = contacts.by_name['calendar1']
+		const $name2 = contacts.by_name['calendar2']
+		const $month1 = contacts.by_name['cal-month-1']
+		const $month2 = contacts.by_name['cal-month-2']
+		let new_pos
+		if (name === 'cal-month-1') {
+			if (target === 'prev') new_pos = current_state.first.pos - 1
+			else if (target === 'next') new_pos = current_state.first.pos + 1
+			if ((current_state.second.pos - current_state.first.pos) === 1 && new_pos > current_state.first.pos) return
+			current_state.first.pos = new_pos
+			$month1.notify($month1.make({ to: $month1.address, type: 'update', data : { current: new_pos } }))
+			$name1.notify($name1.make({ to: $name1.address, type: 'change', data: { current: new_pos } }))
+		} else if (name === 'cal-month-2') {
+			if (target === 'prev') new_pos = current_state.second.pos - 1
+			else if (target === 'next') new_pos = current_state.second.pos + 1
+			if ((current_state.second.pos - current_state.first.pos) === 1 && new_pos < current_state.second.pos) return
+			current_state.second.pos = new_pos
+			$month2.notify($month2.make({ to: $month2.address, type: 'update', data : { current: new_pos } }))
+			$name2.notify($name2.make({ to: $name2.address, type: 'change', data: { current: new_pos } }))
+		}
+	}
   
   function forwardMessage ({from, type, data = {}}) {
     let keys = Object.keys(contacts.by_name)
@@ -134,7 +108,7 @@ function triggerNextMonth () {
       $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: value } } ))
   }
 
-  function notifyOtherCalenderSelectingLast (from) {
+  function notifyOtherCalendarSelectingLast (from) {
       const $from = contacts.by_address[from]
       let type
       if (contacts.by_address[from].name === name1) type = 'color-from-start'
