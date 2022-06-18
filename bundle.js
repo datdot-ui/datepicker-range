@@ -22716,10 +22716,9 @@ function datepicker (opts, parent_wire) {
 	const { name = 'datepicker', first, second, status = 'cleared' } = opts
   let name1 = 'calendar1'
   let name2 = 'calendar2'
-  let value = {}
 	const current_state = {
-		first: { pos: first.pos},
-		second:	{ pos: second.pos }
+		first: { pos: first.pos, value: null },
+		second:	{ pos: second.pos, value: null }
 	}
   
   // -----------------------------------
@@ -22732,13 +22731,12 @@ function datepicker (opts, parent_wire) {
     const name = contacts.by_address[from].name
     console.log('DATEPICKER', { type, from, name, msg, data })
 		if (type === 'click') handle_click(name, data.name)
-    if (type === 'value/first') return storeFirstAndNotify(from, data)
-    if (type === 'value/second') return notifyParent(from, data)
-    if (type === 'selecting-second') return notifyOtherCalendarSelectingLast(from)
-    if (type === 'cleared') return clearOther( contacts.by_address[from].name === name1 ? name2 : name1)
-    if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
+    if (type === 'value-first' || type === 'value-second') return store_val(from, type, data)
+    // if (type === 'value-second') return notifyOtherCalendarSelectingLast(from)
+    if (type === 'clear-other') return clearOther(contacts.by_address[from].name === name1 ? name2 : name1)
+    // if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
 	}
-  
+
   // elements
 	
   let cal1 = calendarDays({name: name1, month: first.pos, days: first.days, year: first.year, status }, contacts.add(name1))
@@ -22788,47 +22786,28 @@ function datepicker (opts, parent_wire) {
 			$name2.notify($name2.make({ to: $name2.address, type: 'change', data: { current: new_pos } }))
 		}
 	}
-  
-  function forwardMessage ({from, type, data = {}}) {
-    let keys = Object.keys(contacts.by_name)
-    if (from) keys = keys.filter(key => key !== contacts.by_address[from].name) // notify all other children
-    broadcast(keys, type, data)
-  }
 
   function clearOther (name) {
       const $name = contacts.by_name[name]
       $name.notify($name.make({ to: $name.address, type: 'clear' }))
   }
 
-  function notifyParent (from, data) {
-      value.second = data.body
-      const $parent = contacts.by_name['parent']
-      $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: value } } ))
-  }
 
-  function notifyOtherCalendarSelectingLast (from) {
-      const $from = contacts.by_address[from]
-      let type
-      if (contacts.by_address[from].name === name1) type = 'color-from-start'
-      if (contacts.by_address[from].name === name2) type = 'color-to-end'
-      $from.notify($from.make({ to: $from.address, type }))
-  }
-
-  function storeFirstAndNotify (from, data) {
-      value.first = data.body
-      const type = contacts.by_address[from].name === name1 ? 'first-selected-by-startcal' : 'first-selected-by-endcal'
-      const keys = Object.keys(contacts.by_name).filter(key => key !== contacts.by_address[from].name) // notify all other children
-      const $parent = contacts.by_name['parent']
-      $parent.notify($parent.make({ to: $parent.address, type: 'value/first', date: { data } } ))
-      broadcast(keys, type, data)
-  }
-
-  function broadcast (keys, type, data) {
-    for ( let i = 0, len = keys.length; i < len; i++) {
-      const key = keys[i]
-        const $key = contacts.by_name[key]
-        $key.notify($key.make({ to: $key.address, type, data }))
+  function store_val (from, type, data) {
+    const name = contacts.by_address[from].name
+    if (type === 'value-first') {
+      current_state.first.value = data.body
+      type = (name === 'calendar1') ? 'first-selected-by-startcal' : 'first-selected-by-endcal' 
+    } else if (type === 'value-second') {
+      current_state.second.value = data.body
+      type = 'second-selected' 
     }
+    let other_name = (name === 'calendar1') ? 'calendar2' : 'calendar1'
+    const $other = contacts.by_name[other_name]
+    $other.notify($other.make({ to: $other.address, type, date: { data } } ))
+    console.log('Notifying other', { $other, type })
+    const $parent = contacts.by_name['parent']
+    $parent.notify($parent.make({ to: $parent.address, type: 'value-first', date: { data } } ))
   }
 
 }
@@ -22905,32 +22884,41 @@ module.exports = calendarDays
 function calendarDays(opts, parent_wire) {
 	const { name = 'calendar', month, days, year, status = 'cleared'} = opts
 
+	const current_state = {
+		name,
+		month,
+		days,
+		year,
+		status,
+		first: null,
+		second: null,
+	}
+
 	//protocol
 	const initial_contacts = { 'parent': parent_wire }
 	const contacts = protocol_maker('input-number', listen, initial_contacts)
 
   function listen (msg) {
-      const { head, refs, type, data, meta } = msg // receive msg
-      const [from] = head
-      console.log('Cal days', { type, from, name: contacts.by_address[from].name, msg, data })
-      // handlers
-      if (type === 'clear') return actionClear()
-      if (type === 'selecting-second') return actionSelectingSecond(data.body)
-      if (type === 'not-selecting-second') return actionKeepFirst(data.body)
-      if (type === 'first-selected-by-startcal') return setStatus('first-selected-by-startcal')
-      if (type === 'first-selected-by-endcal') return setStatus('first-selected-by-endcal')
-      if (type === 'second-selected') return setStatus('second-selected-by-other')
-      if (type === 'color-from-start') return actionColorFromStart()
-      if (type === 'color-to-end') return actionColorToEnd()
-      if (type === 'change') return actionRenderNewCalendars(data)
-      if (type === 'color-range-from-start') return 
-      if (type === 'color-range-to-end') return 
+		const { head, refs, type, data, meta } = msg // receive msg
+		const [from, to] = head
+		console.log('Cal days', { type, name: contacts.by_address[from].name, msg, data })
+		// handlers
+		if (type === 'clear') return clearSelf()
+		if (type === 'selecting-second') return colorRange(0, current_state.first)
+		if (type === 'not-selecting-second') {}
+		if (type === 'first-selected-by-startcal') return setStatus('first-selected-by-startcal')
+		if (type === 'first-selected-by-endcal') return setStatus('first-selected-by-endcal')
+		if (type === 'second-selected') return setStatus('second-selected-by-other')
+		if (type === 'color-from-start') return colorRange(0, current_state.first)
+		if (type === 'color-to-end') return colorRange(current_state.first, days + 1)
+		if (type === 'change') return render_new_cal(data)
+		if (type === 'color-range-from-start') return 
+		if (type === 'color-range-to-end') return 
 
   }
 
 	// make calendar days
 	let nowMonth = month, nowDays = days, nowYear = year
-	let first, second
 	
 	const el = document.createElement('div')
 	const calendar = makeDays(nowDays)
@@ -22945,184 +22933,153 @@ function calendarDays(opts, parent_wire) {
 
 	return el
 
-	function setStatus( nextStatus ) {
-			console.log('setStatus', JSON.stringify({ type: 'status', data: { body: nextStatus } }, 0, 2))
-			status = nextStatus
-			$parent.notify($parent.make({ to: $parent.address, type: 'status', data: { status: nextStatus } }))
+	// event handlers
+	function onmousemove (event) {
+		console.log('onmousemove - current status', name, current_state.status)
+		const btn = event.target
+		const num = parseInt(btn.dataset.num)
+		if (!num || btn.classList.contains(css["disabled-day"])) return
+		if (current_state.status === 'first-selected-by-self') return markRange(current_state.first, num)
+		if (current_state.status === 'first-selected-by-startcal') return markRange(0, num)
+		if (current_state.status === 'first-selected-by-endcal') return markRange(num, days + 1)
+	}
+	function onclick (event) {
+		const btn = event.target
+		const current = parseInt(btn.dataset.num)
+		if (!current || btn.classList.contains(css["disabled-day"])) return
+		console.log('onclick - current status', current_state.status, current )
+		if (current_state.status === 'cleared') return selectFirst(btn, current)
+		if (current_state.status === 'first-selected-by-self') return selectSecond(btn, current)
+		if (current_state.status === 'first-selected-by-startcal') return selectSecond(btn, current)
+		if (current_state.status === 'first-selected-by-endcal') return selectSecond(btn, current)
+		if (current_state.status === 'second-selected-by-self') return selectFirst(btn, current)
+		if (current_state.status === 'second-selected-by-other') return selectFirst(btn, current)
+}
+	function onmouseleave (event) {
+		console.log('onmouseleave - first selected', current_state.status)
+		if (current_state.status === 'first-selected-by-startcal') return clearSelf()
+		if (current_state.status === 'first-selected-by-endcal') return clearSelf()
+		current_state.second = void 0
+		if (current_state.status === 'first-selected-by-self') {
+			current_state.second = void 0
+			if (name === 'calendar1') return markRange(current_state.first, days + 1)
+			else if (name === 'calendar2') return markRange(0, current_state.first)
+		}
+	}
+	function onmouseenter (event) {
+		console.log('onmouseenter - first selected', current_state.status)
+		if (current_state.status === 'first-selected-by-startcal') return notifyOther()
+		if (current_state.status === 'first-selected-by-endcal') return notifyOther()
 	}
 
-	function actionRenderNewCalendars(data) {
-			const { current } = data
-			nowMonth = current
 
-			let date = setMonth(new Date(), current)
-			let year = getYear(date)
-			let days = getDaysInMonth(date)
+	// helpers
 
-			nowYear = year
-			nowDays = days
-			const cal = makeDays(nowDays)
-			buttons = [...cal.children]
-
-			cal.onmousemove = onmousemove
-			cal.onclick = onclick
-			cal.onmouseleave = onmouseleave
-			cal.onmouseenter = onmouseenter
-			el.innerHTML = ''
-			el.append(cal)
-			
+	function clearSelf () {
+		for (var i = 0; i < buttons.length; i++) {
+			buttons[i].classList.remove(css['date-in-range'])
+			buttons[i].classList.remove(css['date-selected'])
+		}		
 	}
-	
-	function actionSelectingSecond (body) { colorRange(0, first) }
 
-	function actionKeepFirst (body) { onlyKeepFirst() }
+	function clearOther () {
+		current_state.second = void 0
+		$parent.notify($parent.make({ to: $parent.address, type: 'clear-other', data: { body: '' } }))
+	}
 
-	function actionColorToEnd () { colorRange(first, days + 1) }
-
-	function actionColorFromStart () { colorRange(0, first) }
-
-	function actionClear () { clearSelf() }
-
-	function clearAndNotify () {
+	function selectFirst (btn, current) {
 		clearSelf()
-		$parent.notify($parent.make({ to: $parent.address, type: 'not-selecting-second', data: { body: '' } }))
+		clearOther()
+		current_state.first = current
+		btn.classList.add(css['date-selected'])
+		setStatus('first-selected-by-self')
+		$parent.notify($parent.make({ to: $parent.address, type: 'value-first', data: { body: [nowYear, nowMonth+1, current_state.first] } }))
+	}
+
+	function selectSecond (btn, current) {
+		current_state.second = current
+		btn.classList.add(css['date-selected'])
+		setStatus('second-selected-by-self')
+		$parent.notify($parent.make({ to: $parent.address, type: 'value-second', data: { body: [nowYear, nowMonth+1, current_state.second] } }))
+	}
+
+	function setStatus( nextStatus ) {
+		console.log('setStatus', JSON.stringify({ type: 'status', name,  data: { body: nextStatus } }, 0, 2))
+		current_state.status = nextStatus
+		$parent.notify($parent.make({ to: $parent.address, type: 'status', data: { status: nextStatus } }))
+	}
+
+	function render_new_cal(data) {
+		const { current } = data
+		let date = setMonth(new Date(), current)
+		let year = getYear(date)
+		let days = getDaysInMonth(date)
+		nowYear = year
+		nowDays = days
+
+		const cal = makeDays(nowDays)
+		buttons = [...cal.children]
+		cal.onmousemove = onmousemove
+		cal.onclick = onclick
+		cal.onmouseleave = onmouseleave
+		cal.onmouseenter = onmouseenter
+		el.innerHTML = ''
+		el.append(cal)	
+	}
+
+
+	function markRange (A,B) {
+		console.log('mark range', {A, B})
+		if (A === B) return // onlyKeepFirst()
+		if (A < B) colorRange(A, B)
+		else colorRange(B, A)
+	}
+
+	function colorRange (start, end) {
+		buttons.map( btn => {
+			let current = parseInt(btn.dataset.num)
+			if (!current || btn.classList.contains(css["disabled-day"])) return
+			if (current < start || current > end) {
+				btn.classList.remove(css['date-selected'])
+				btn.classList.remove(css['date-in-range'])
+			}
+			if (current > start && current < end ) btn.classList.add(css['date-in-range'])
+		})
 	}
 		
 	function notifyOther () { $parent.notify($parent.make({ to: $parent.address, type: 'selecting-second' })) }
 
-	function onlyKeepFirst () {
-			buttons.map( btn => {
-					const num = parseInt(btn.dataset.num)
-					if ( num != first ) {
-							btn.classList.remove(css['date-in-range'])
-							btn.classList.remove([css['date-selected']])
-					}
-			})
-	}
-
-	function onmouseenter (event) {
-			console.log('current status', status)
-			if (status === 'first-selected-by-startcal') return notifyOther()
-			if (status === 'first-selected-by-endcal') return notifyOther()
-	}
-
-	function onmouseleave (event) {
-			console.log('current status', status)
-			if (status === 'first-selected-by-startcal') return clearAndNotify()
-			if (status === 'first-selected-by-endcal') return clearAndNotify()
-			if (status === 'first-selected-by-self') return onlyKeepFirst()
-	}
-
-	function onmousemove (event) {
-			const btn = event.target
-			const current = parseInt(btn.dataset.num)
-			if (!current || btn.classList.contains(css["disabled-day"])) return
-			if (status === 'first-selected-by-startcal') return markRange(btn, 0, current)
-			if (status === 'first-selected-by-endcal') return markRange(btn, first, current)
-			if (status === 'first-selected-by-self') return markRange(btn, first, current)
-	}
-
-	function onclick (event) {
-			console.log('onclick: current status', status)
-			const btn = event.target
-			const current = parseInt(btn.dataset.num)
-			if (!current || btn.classList.contains(css["disabled-day"])) return
-			if (status === 'cleared') return selectFirst(btn, current)
-			if (status === 'first-selected-by-self') return selectSecond(btn, current)
-			if (status === 'first-selected-by-startcal') return selectSecond(btn, current)
-			if (status === 'first-selected-by-endcal') return selectSecond(btn, current)
-			if (status === 'second-selected-by-self') return selectFirst(btn, current)
-			if (status === 'second-selected-by-other') return selectFirst(btn, current)
-	}
-
-	function clearSelf () {
-			for (var i = 0; i < buttons.length; i++) {
-					buttons[i].classList.remove(css['date-in-range'])
-					buttons[i].classList.remove(css['date-selected'])
-			}
-			first = second = void 0
-	}
-
-	function selectSecond (btn, current) {
-			second = current
-			setStatus('second-selected-by-self')
-			$parent.notify($parent.make({ to: $parent.address, type: 'second-selected' }))
-			return $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: [nowYear, nowMonth+1, second] } }))
-	}
-
-	function selectFirst (btn, current) {
-			clearSelf()
-			$parent.notify($parent.make({ to: $parent.address, type: 'cleared' })) // notify parent to notify other cal to clear itself too
-			first = current
-			btn.classList.add(css['date-selected'])
-			setStatus('first-selected-by-self')
-			return $parent.notify($parent.make({ to: $parent.address, type: 'value/first', data: { body: [nowYear, nowMonth+1, first] } }))
-	}
-
-	function markRange (btn, A, B) {
-			if (A === B) return onlyKeepFirst()
-			if (A < B) colorRange(A, B)
-			else colorRange(B, A)
-	}
-
-	function colorRange (first, second) {
-			buttons.map( btn => {
-					let current = parseInt(btn.dataset.num)
-					if (!current || btn.classList.contains(css["disabled-day"])) return
-					if (current < first) {
-							btn.classList.remove(css['date-selected'])
-							btn.classList.remove(css['date-in-range'])
-					} 
-					if (current === first ) { 
-							btn.classList.add(css['date-selected'])
-					}
-					if (current > first) {
-							btn.classList.add(css['date-in-range'])
-					}
-					if (current === second) {
-							btn.classList.add(css['date-selected'])
-					}
-					if (current > second - 1) {
-							btn.classList.remove(css['date-in-range'])
-					}
-					if (current > second) {
-							btn.classList.remove(css['date-selected'])
-							btn.classList.remove(css['date-in-range'])
-					}
-			})
-	}
-
 	function makeDays (days) {
-			const el = bel`<section role="calendar-days" class=${css["calendar-days"]}></section>`
-			// make space for week
-			getSpaceInPrevMonth(el)
+		const el = bel`<section role="calendar-days" class=${css["calendar-days"]}></section>`
+		// make space for week
+		getSpaceInPrevMonth(el)
 
-			for (let i = 1; i < days + 1; i++) {
-					let formatDate = format(new Date(nowYear, nowMonth, i), 'd MMMM yyyy, EEEE')
-					let btn = bel`<button role="button" aria-selected="false" tabindex="-1" data-num="${i}" aria-label="${formatDate}" data-date="${nowYear}-${nowMonth+1}-${i}">${i}</button>`
-					if (isToday(new Date(nowYear, nowMonth, i)) ) {
-							btn.classList.add(css.today)
-							btn.setAttribute('aria-today', true)
-					} else { 
-							btn.classList.add(css.day)
-							if ( isPast(new Date(nowYear, nowMonth, i)) ) btn.classList.add(css["disabled-day"])
-							btn.setAttribute('aria-today', false)
-					}
-					el.append(btn)
+		for (let i = 1; i < days + 1; i++) {
+			let formatDate = format(new Date(nowYear, nowMonth, i), 'd MMMM yyyy, EEEE')
+			let btn = bel`<button role="button" aria-selected="false" tabindex="-1" data-num="${i}" aria-label="${formatDate}" data-date="${nowYear}-${nowMonth+1}-${i}">${i}</button>`
+			if (isToday(new Date(nowYear, nowMonth, i)) ) {
+				btn.classList.add(css.today)
+				btn.setAttribute('aria-today', true)
+			} else { 
+				btn.classList.add(css.day)
+				if ( isPast(new Date(nowYear, nowMonth, i)) ) btn.classList.add(css["disabled-day"])
+				btn.setAttribute('aria-today', false)
 			}
-			
-			return el
+			el.append(btn)
+		}
+		
+		return el
 	}
 
 	function getSpaceInPrevMonth (el) {
-			// get days in previous month
-			let daysInPrevMonth = getDaysInMonth(new Date(nowYear, nowMonth-1))
-			// get day in prev month which means to add how many spans
-			let dayInPrevMonth = getDay(new Date(nowYear, nowMonth-1, daysInPrevMonth))
-			for (let s = dayInPrevMonth; s > 0; s--) {
-					let span = bel`<div class=${css['day-prev']} role="presentation" aria-label aria-disabled="false"></div>`
-					el.append((span))
-			}
+		// get days in previous month
+		let daysInPrevMonth = getDaysInMonth(new Date(nowYear, nowMonth-1))
+		// get day in prev month which means to add how many spans
+		let dayInPrevMonth = getDay(new Date(nowYear, nowMonth-1, daysInPrevMonth))
+		for (let s = dayInPrevMonth; s > 0; s--) {
+				let span = bel`<div class=${css['day-prev']} role="presentation" aria-label aria-disabled="false"></div>`
+				el.append((span))
+		}
 	}
 
 }

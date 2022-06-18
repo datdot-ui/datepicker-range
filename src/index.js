@@ -18,10 +18,9 @@ function datepicker (opts, parent_wire) {
 	const { name = 'datepicker', first, second, status = 'cleared' } = opts
   let name1 = 'calendar1'
   let name2 = 'calendar2'
-  let value = {}
 	const current_state = {
-		first: { pos: first.pos},
-		second:	{ pos: second.pos }
+		first: { pos: first.pos, value: null },
+		second:	{ pos: second.pos, value: null }
 	}
   
   // -----------------------------------
@@ -34,13 +33,12 @@ function datepicker (opts, parent_wire) {
     const name = contacts.by_address[from].name
     console.log('DATEPICKER', { type, from, name, msg, data })
 		if (type === 'click') handle_click(name, data.name)
-    if (type === 'value/first') return storeFirstAndNotify(from, data)
-    if (type === 'value/second') return notifyParent(from, data)
-    if (type === 'selecting-second') return notifyOtherCalendarSelectingLast(from)
-    if (type === 'cleared') return clearOther( contacts.by_address[from].name === name1 ? name2 : name1)
-    if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
+    if (type === 'value-first' || type === 'value-second') return store_val(from, type, data)
+    // if (type === 'value-second') return notifyOtherCalendarSelectingLast(from)
+    if (type === 'clear-other') return clearOther(contacts.by_address[from].name === name1 ? name2 : name1)
+    // if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
 	}
-  
+
   // elements
 	
   let cal1 = calendarDays({name: name1, month: first.pos, days: first.days, year: first.year, status }, contacts.add(name1))
@@ -90,47 +88,28 @@ function datepicker (opts, parent_wire) {
 			$name2.notify($name2.make({ to: $name2.address, type: 'change', data: { current: new_pos } }))
 		}
 	}
-  
-  function forwardMessage ({from, type, data = {}}) {
-    let keys = Object.keys(contacts.by_name)
-    if (from) keys = keys.filter(key => key !== contacts.by_address[from].name) // notify all other children
-    broadcast(keys, type, data)
-  }
 
   function clearOther (name) {
       const $name = contacts.by_name[name]
       $name.notify($name.make({ to: $name.address, type: 'clear' }))
   }
 
-  function notifyParent (from, data) {
-      value.second = data.body
-      const $parent = contacts.by_name['parent']
-      $parent.notify($parent.make({ to: $parent.address, type: 'value/second', data: { body: value } } ))
-  }
 
-  function notifyOtherCalendarSelectingLast (from) {
-      const $from = contacts.by_address[from]
-      let type
-      if (contacts.by_address[from].name === name1) type = 'color-from-start'
-      if (contacts.by_address[from].name === name2) type = 'color-to-end'
-      $from.notify($from.make({ to: $from.address, type }))
-  }
-
-  function storeFirstAndNotify (from, data) {
-      value.first = data.body
-      const type = contacts.by_address[from].name === name1 ? 'first-selected-by-startcal' : 'first-selected-by-endcal'
-      const keys = Object.keys(contacts.by_name).filter(key => key !== contacts.by_address[from].name) // notify all other children
-      const $parent = contacts.by_name['parent']
-      $parent.notify($parent.make({ to: $parent.address, type: 'value/first', date: { data } } ))
-      broadcast(keys, type, data)
-  }
-
-  function broadcast (keys, type, data) {
-    for ( let i = 0, len = keys.length; i < len; i++) {
-      const key = keys[i]
-        const $key = contacts.by_name[key]
-        $key.notify($key.make({ to: $key.address, type, data }))
+  function store_val (from, type, data) {
+    const name = contacts.by_address[from].name
+    if (type === 'value-first') {
+      current_state.first.value = data.body
+      type = (name === 'calendar1') ? 'first-selected-by-startcal' : 'first-selected-by-endcal' 
+    } else if (type === 'value-second') {
+      current_state.second.value = data.body
+      type = 'second-selected' 
     }
+    let other_name = (name === 'calendar1') ? 'calendar2' : 'calendar1'
+    const $other = contacts.by_name[other_name]
+    $other.notify($other.make({ to: $other.address, type, date: { data } } ))
+    console.log('Notifying other', { $other, type })
+    const $parent = contacts.by_name['parent']
+    $parent.notify($parent.make({ to: $parent.address, type: 'value-first', date: { data } } ))
   }
 
 }
