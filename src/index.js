@@ -34,18 +34,16 @@ function datepicker (opts, parent_wire) {
     console.log('DATEPICKER', { type, from, name, msg, data })
 		if (type === 'click') handle_click(name, data.name)
     if (type === 'value-first' || type === 'value-second') return store_val(from, type, data)
-    // if (type === 'value-second') return notifyOtherCalendarSelectingLast(from)
     if (type === 'clear-other') return clearOther(contacts.by_address[from].name === name1 ? name2 : name1)
     // if (type !== 'ack' && type !== 'ready') return forwardMessage({ from, type })
 	}
 
-  // elements
-	
+  // elements	
   let cal1 = calendarDays({name: name1, month: first.pos, days: first.days, year: first.year, status }, contacts.add(name1))
   let cal2 = calendarDays({name: name2, month: second.pos	, days: second.days, year: second.year, status }, contacts.add(name2))
   const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-  const month1 = calendarMonth({ getDate: new Date(first.year, first.pos), view: 'datepicker-range-days'}, contacts.add(`cal-month-1`))
-  const month2 = calendarMonth({ getDate: new Date(second.year, second.pos	), view: 'datepicker-range-days'}, contacts.add(`cal-month-2`))
+  const month1 = calendarMonth({ pos: first.pos }, contacts.add(`cal-month-1`))
+  const month2 = calendarMonth({ pos: second.pos }, contacts.add(`cal-month-2`))
 
   const container = bel`<div class=${css['calendar-container']}></div>`
 
@@ -96,6 +94,7 @@ function datepicker (opts, parent_wire) {
 
 
   function store_val (from, type, data) {
+    const $parent = contacts.by_name['parent']
     const name = contacts.by_address[from].name
     if (type === 'value-first') {
       current_state.first.value = data.body
@@ -103,13 +102,12 @@ function datepicker (opts, parent_wire) {
     } else if (type === 'value-second') {
       current_state.second.value = data.body
       type = 'second-selected' 
+      $parent.notify($parent.make({ to: $parent.address, type: 'selection', data: { first: current_state.first.value, second: current_state.second.value } } ))
     }
     let other_name = (name === 'calendar1') ? 'calendar2' : 'calendar1'
     const $other = contacts.by_name[other_name]
     $other.notify($other.make({ to: $other.address, type, date: { data } } ))
     console.log('Notifying other', { $other, type })
-    const $parent = contacts.by_name['parent']
-    $parent.notify($parent.make({ to: $parent.address, type: 'value-first', date: { data } } ))
   }
 
 }

@@ -34,6 +34,9 @@ function demo () {
                 $month2.notify($month2.make({ to: $month2.address, type: 'update', data : { current: new_pos } }))
             }
         }
+        if (type === 'selection') {
+            console.log('Date selected from', data.first, 'to', data.second)
+        }
     }
 // ------------------------------------
 
@@ -51,11 +54,10 @@ function demo () {
         cal_header_2: { pos: 7 },
     }
     let counter = 0
-
     // SUB COMPONENTS
     const cal_header1 = calendarMonth({ pos: current_state.cal_header_1.pos }, contacts.add(`cal-header-${counter++}`))
     const cal_header2 = calendarMonth({ pos: current_state.cal_header_2.pos }, contacts.add(`cal-header-${counter++}`))
-    const cal1 = datepicker({ first:{ year, pos, days: first_days }, second: { year, pos: pos + 1, days: second_days } }, contacts.add(`cal-${counter++}`))
+    const calendar = datepicker({ first:{ year, pos, days: first_days }, second: { year, pos: pos + 1, days: second_days } }, contacts.add(`cal-${counter++}`))
 
     const weekday = bel`<section class=${css['calendar-weekday']} role="weekday"></section>`
     const weekList= ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -74,7 +76,7 @@ function demo () {
         <!--- ui-datepicker start -->
         <div class=${css['ui-datepicker']}>
           <h2 class=${css.title}>Date Picker</h2>
-          ${cal1}
+          ${calendar}
         </div>
         <!--- // ui-datepicker end -->
       </section>
