@@ -1,7 +1,7 @@
 {
-  "name": "datdot-ui-timeline-days",
-  "version": "0.0.1-alpha",
-  "description": "datdot ui timeline days",
+  "name": "datdot-ui-datepicker",
+  "version": "0.0.4-alpha",
+  "description": "datdot ui datepicker",
   "main": "src/index.js",
   "scripts": {
     "start": "budo demo/demo.js:bundle.js --open --live --cors",
@@ -10,20 +10,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/datdot-ui/timeline-days.git"
+    "url": "git+https://github.com/datdot-ui/datepicker.git"
   },
   "keywords": [
     "datdot",
     "ui",
-    "timeline-days",
+    "datepicker",
     "list"
   ],
   "author": "datdotorg",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/datdot-ui/timeline-days/issues"
+    "url": "https://github.com/datdot-ui/datepicker/issues"
   },
-  "homepage": "https://github.com/datdot-ui/timeline-days#readme",
+  "homepage": "https://github.com/datdot-ui/datepicker#readme",
   "devDependencies": {
     "browserify": "^17.0.0",
     "budo": "^11.6.4"
@@ -34,6 +34,8 @@
     "protocol-maker": "github:datdotorg/protocol-maker#v0.0.1-alpha",
     "date-fns": "^2.28.0",
     "datdot-ui-icon": "git+https://github.com/datdot-ui/icon.git#v0.0.4-alpha",
-    "datdot-ui-button": "git+https://github.com/datdot-ui/button.git#v0.0.4-alpha"
+    "datdot-ui-button": "git+https://github.com/datdot-ui/button.git#v0.0.4-alpha",
+    "datdot-ui-calendar-month": "git+https://github.com/datdot-ui/calendar-month.git#v0.0.4-alpha",
+    "datdot-ui-calendar-days": "git+https://github.com/datdot-ui/calendar-days.git#v0.0.4-alpha"
   }
 }

@@ -3,31 +3,30 @@ DatDot UI component
 
 Opts
 ---
-`{name = 'datepicker', month1, month2, status = 'cleared'}`
+`{ name = 'datepicker', first = { pos, value, year, month, days }, second = { pos, value, year, month, days }, theme = default_theme }`
 
 
 Incomming message types
 ---
 
-- `value/first`
-- `value/second`
-- `selecting/second`
-- `cleared`
+- `click`
+- `value-first`
+- `value-second`
+- `clear`
+- `update`
 
 Outgoing message types
 ---
 
 **parent**
-- `ready`
-- `value-first`
-- `value-second`
-- `color-from-start`
-- `color-to-end`
+- `selected`
+
+**calendar month**
+- `update`
 
 **calendar days**
-- `change`
+- `update`
 - `clear`
-
-**all recipients**
 - `first-selected-by-startcal`
 - `first-selected-by-endcal`
+- `second-selected`
