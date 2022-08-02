@@ -1,5 +1,3 @@
-const bel = require('bel')
-const csjs = require('csjs-inject')
 const protocol_maker = require('protocol-maker')
 const datepicker = require('..')
 
@@ -47,11 +45,4 @@ function demo () {
 
 }
 
-const css = csjs`
-html, body {
-	padding: 0;
-	margin: 0;
-	height: 100vh;
-}
-`
 document.body.append(demo())

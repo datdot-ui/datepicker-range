@@ -1,4 +1,3 @@
-const bel = require('bel')
 const protocol_maker = require('protocol-maker')
 const { setMonth, getYear, getMonth, getDaysInMonth } = require('date-fns')
 const calendarMonth = require('datdot-ui-calendar-month')
