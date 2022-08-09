@@ -23395,8 +23395,8 @@ module.exports = function (css, options) {
 },{}],345:[function(require,module,exports){
 const protocol_maker = require('protocol-maker')
 const { setMonth, getYear, getMonth, getDaysInMonth } = require('date-fns')
-const calendarMonth = require('datdot-ui-calendar-month')
-const calendarDays = require('datdot-ui-calendar-days')
+const calendarMonth = require('datdot-ui-month-selector')
+const calendarDays = require('datdot-ui-day-selector-range')
 
 var id = 0
 var count = 0
@@ -23630,4 +23630,4 @@ function get_theme () {
   }
   `
 }
-},{"datdot-ui-calendar-days":338,"datdot-ui-calendar-month":339,"date-fns":152,"protocol-maker":341}]},{},[1]);
+},{"datdot-ui-day-selector-range":338,"datdot-ui-month-selector":339,"date-fns":152,"protocol-maker":341}]},{},[1]);

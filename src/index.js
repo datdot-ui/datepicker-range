@@ -1,7 +1,7 @@
 const protocol_maker = require('protocol-maker')
 const { setMonth, getYear, getMonth, getDaysInMonth } = require('date-fns')
-const calendarMonth = require('datdot-ui-calendar-month')
-const calendarDays = require('datdot-ui-calendar-days')
+const calendarMonth = require('datdot-ui-month-selector')
+const calendarDays = require('datdot-ui-day-selector-range')
 
 var id = 0
 var count = 0
